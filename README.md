@@ -85,7 +85,7 @@ AGENTS.md from the start; nothing imports them yet.
 ## Phase status
 
 - [x] 1. Setup, canvas, test cube, flavor picker
-- [ ] 2. Glass and liquid shader
+- [x] 2. Glass and liquid shader
 - [ ] 3. Scroll story: ice, mint, fruit, bubbles
 - [ ] 4. Flavor switcher driven by `flavors.js`
 - [ ] 5. UI layer: hero, cards, about, CTA

@@ -1,51 +1,48 @@
-import { useEffect, useRef, useState } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
-import * as THREE from 'three'
-import { getFlavor } from '../config/flavors.js'
-import { dprCap, prefersReducedMotion } from '../config/performance.js'
-import { useStore } from '../store/useStore.js'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { dprCap, isMobile, prefersReducedMotion } from '../config/performance.js'
+import Glass from './Glass.jsx'
+import Liquid from './Liquid.jsx'
 
 /**
- * Phase 1 test object. Replaced by the glass in Phase 2.
- * The color is read from config/flavors.js and lerped, never hard-cut.
+ * Fits the glass to whatever screen it lands on. Glass geometry is 1.0 tall
+ * and 1.0 wide at the rim, so the scale factor is also the world height.
  */
-function TestCube() {
-  const meshRef = useRef(null)
-  const activeFlavor = useStore((state) => state.activeFlavor)
-  const targetColor = useRef(null)
+function useGlassScale() {
+  const viewport = useThree((state) => state.viewport)
 
-  if (targetColor.current === null) {
-    targetColor.current = new THREE.Color(
-      getFlavor(useStore.getState().activeFlavor).liquidColor,
-    )
-  }
+  return useMemo(() => {
+    const byHeight = viewport.height * 0.55
+    const byWidth = viewport.width * 0.62
+    return Math.min(byHeight, byWidth, 2.4)
+  }, [viewport.height, viewport.width])
+}
 
-  useEffect(() => {
-    targetColor.current.set(getFlavor(activeFlavor).liquidColor)
-  }, [activeFlavor])
+/** Idle sway so the glass reads as alive rather than parked. */
+function MojitoGroup() {
+  const groupRef = useRef(null)
+  const scale = useGlassScale()
 
-  useFrame((_, delta) => {
-    const mesh = meshRef.current
-    if (!mesh) return
+  useFrame((state) => {
+    const group = groupRef.current
+    if (!group) return
 
-    if (!prefersReducedMotion) {
-      mesh.rotation.x += delta * 0.4
-      mesh.rotation.y += delta * 0.6
-    }
+    if (prefersReducedMotion) return
 
-    // Frame-rate independent easing toward the active flavor's color.
-    mesh.material.color.lerp(targetColor.current, 1 - Math.exp(-6 * delta))
+    const t = state.clock.elapsedTime
+    group.rotation.y = Math.sin(t * 0.25) * 0.16
+    group.rotation.z = Math.sin(t * 0.18 + 1.3) * 0.02
+    group.position.y = 0.12 + Math.sin(t * 0.5) * 0.012
   })
 
   return (
-    <mesh ref={meshRef}>
-      <boxGeometry args={[1.5, 1.5, 1.5]} />
-      <meshStandardMaterial
-        color={getFlavor(activeFlavor).liquidColor}
-        roughness={0.3}
-        metalness={0.05}
-      />
-    </mesh>
+    <group ref={groupRef} scale={scale} position={[0, 0.12, 0]}>
+      {/* Lift so the 1.0-tall glass is centered on its own origin. */}
+      <group position={[0, -0.5, 0]}>
+        <Glass segments={isMobile ? 40 : 72} />
+        <Liquid radialSegments={isMobile ? 32 : 56} />
+      </group>
+    </group>
   )
 }
 
@@ -71,8 +68,9 @@ export default function Scene() {
         camera={{ position: [0, 0, 5], fov: 40 }}
         gl={{ antialias: true, alpha: true }}
       >
-        <directionalLight position={[3, 4, 5]} intensity={2.2} />
-        <TestCube />
+        <ambientLight intensity={0.7} />
+        <directionalLight position={[-2.5, 3, -4]} intensity={2.4} />
+        <MojitoGroup />
       </Canvas>
     </div>
   )
