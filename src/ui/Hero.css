@@ -1,0 +1,49 @@
+/* The glass sits centred in the hero, so the copy goes top and the controls
+   go bottom, leaving the middle clear. */
+.hero {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  padding-top: calc(var(--nav-h) + 28px);
+  padding-bottom: 32px;
+}
+
+.hero__content {
+  max-width: 34rem;
+}
+
+.hero__eyebrow {
+  margin-bottom: 14px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.hero__title {
+  font-size: clamp(38px, 11vw, 76px);
+  font-weight: 780;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  text-wrap: balance;
+}
+
+.hero__lede {
+  max-width: 26rem;
+  margin-top: 14px;
+  color: var(--ink-soft);
+  font-size: clamp(16px, 4.2vw, 20px);
+  line-height: 1.4;
+}
+
+.hero__controls {
+  display: flex;
+  justify-content: flex-start;
+}
+
+@media (min-width: 768px) {
+  .hero__lede {
+    max-width: 30rem;
+  }
+}

@@ -1,43 +1,72 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { dprCap, isMobile, prefersReducedMotion } from '../config/performance.js'
+import { FALLBACK_TARGET, GLASS_TARGETS } from '../config/sections.js'
+import { useStore } from '../store/useStore.js'
 import Glass from './Glass.jsx'
 import Liquid from './Liquid.jsx'
 
-/**
- * Fits the glass to whatever screen it lands on. Glass geometry is 1.0 tall
- * and 1.0 wide at the rim, so the scale factor is also the world height.
- */
-function useGlassScale() {
-  const viewport = useThree((state) => state.viewport)
+/** Position/scale ease. Frame-rate independent, ~95% settled in 0.66s. */
+const MOVE_TAU = 0.22
 
-  return useMemo(() => {
-    const byHeight = viewport.height * 0.55
-    const byWidth = viewport.width * 0.62
-    return Math.min(byHeight, byWidth, 2.4)
-  }, [viewport.height, viewport.width])
-}
-
-/** Idle sway so the glass reads as alive rather than parked. */
 function MojitoGroup() {
   const groupRef = useRef(null)
-  const scale = useGlassScale()
+  const viewport = useThree((state) => state.viewport)
 
-  useFrame((state) => {
+  const mode = isMobile ? 'mobile' : 'desktop'
+
+  const baseScale = useMemo(
+    () => Math.min(viewport.height * 0.55, viewport.width * 0.62, 2.4),
+    [viewport.height, viewport.width],
+  )
+
+  // Smoothed transform, eased toward the active section's target each frame.
+  const smoothed = useRef(null)
+
+  useFrame((state, delta) => {
     const group = groupRef.current
     if (!group) return
 
-    if (prefersReducedMotion) return
+    const { activeSection } = useStore.getState()
+    const targets = GLASS_TARGETS[activeSection] ?? FALLBACK_TARGET
+    const target = targets[mode]
 
-    const t = state.clock.elapsedTime
-    group.rotation.y = Math.sin(t * 0.25) * 0.16
-    group.rotation.z = Math.sin(t * 0.18 + 1.3) * 0.02
-    group.position.y = 0.12 + Math.sin(t * 0.5) * 0.012
+    const targetX = target.x * viewport.width
+    const targetY = target.y * viewport.height
+    const targetScale = baseScale * target.scale
+
+    if (smoothed.current === null) {
+      smoothed.current = {
+        x: targetX,
+        y: targetY,
+        scale: targetScale,
+        rot: target.rot,
+      }
+    }
+
+    const current = smoothed.current
+    const step = 1 - Math.exp(-delta / MOVE_TAU)
+
+    current.x += (targetX - current.x) * step
+    current.y += (targetY - current.y) * step
+    current.scale += (targetScale - current.scale) * step
+    current.rot += (target.rot - current.rot) * step
+
+    const time = state.clock.elapsedTime
+    const swayY = prefersReducedMotion ? 0 : Math.sin(time * 0.25) * 0.16
+    const swayZ = prefersReducedMotion ? 0 : Math.sin(time * 0.18 + 1.3) * 0.02
+    const bob = prefersReducedMotion ? 0 : Math.sin(time * 0.5) * 0.012
+
+    group.position.x = current.x
+    group.position.y = current.y + bob
+    group.scale.setScalar(current.scale)
+    group.rotation.y = current.rot + swayY
+    group.rotation.z = swayZ
   })
 
   return (
-    <group ref={groupRef} scale={scale} position={[0, 0.12, 0]}>
-      {/* Lift so the 1.0-tall glass is centered on its own origin. */}
+    <group ref={groupRef}>
+      {/* Centres the 1.0-tall glass on the group origin. */}
       <group position={[0, -0.5, 0]}>
         <Glass segments={isMobile ? 40 : 72} />
         <Liquid radialSegments={isMobile ? 32 : 56} />

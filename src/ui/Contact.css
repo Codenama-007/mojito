@@ -1,0 +1,92 @@
+.contact__title {
+  font-size: clamp(34px, 9vw, 62px);
+  font-weight: 750;
+  letter-spacing: -0.035em;
+  line-height: 0.98;
+}
+
+.contact__placeholder {
+  margin-top: 16px;
+  color: var(--ink-soft);
+  font-size: clamp(16px, 4.2vw, 19px);
+}
+
+/* Revealed by scroll (breakProgress passes 0.6), not by a tap. */
+.contact__details {
+  margin-top: 22px;
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 600ms ease,
+    transform 600ms ease;
+}
+
+.contact__details.is-revealed {
+  opacity: 1;
+  transform: none;
+}
+
+.contact__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: 14px 24px;
+  margin: 0;
+}
+
+.contact__row dt {
+  color: var(--ink-soft);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.contact__row dd {
+  margin: 3px 0 0;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.contact__row a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+}
+
+.contact__row a:hover {
+  border-bottom-color: currentColor;
+}
+
+.contact__order {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin-top: 26px;
+  padding: 0 26px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 650;
+  text-decoration: none;
+  transition: transform 140ms ease;
+}
+
+.contact__order:active {
+  transform: scale(0.97);
+}
+
+.contact__warning {
+  margin-top: 16px;
+  color: #8a3b00;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.contact__warning code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+}

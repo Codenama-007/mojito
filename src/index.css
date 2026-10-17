@@ -6,9 +6,14 @@
 
 :root {
   --ink: #16210f;
-  --picker-surface: rgba(255, 255, 255, 0.78);
-  --picker-border: rgba(22, 33, 15, 0.16);
+  --ink-soft: rgba(22, 33, 15, 0.66);
+  --surface: rgba(255, 255, 255, 0.78);
+  --border: rgba(22, 33, 15, 0.16);
   --fallback-bg: #d2f261;
+
+  /* Navbar height, used for scroll offsets and section top padding. */
+  --nav-h: 64px;
+  --pad: clamp(20px, 5vw, 64px);
 
   --sans: system-ui, 'Segoe UI', Roboto, -apple-system, sans-serif;
 
@@ -20,26 +25,37 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-html,
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+/* The document scrolls normally. Lenis drives the scroll position itself;
+   the canvas and backdrop stay pinned behind the content. */
 body {
   margin: 0;
   padding: 0;
+  background: var(--fallback-bg);
+  color: var(--ink);
+  overscroll-behavior-y: none;
 }
 
-/* 100svh, not 100vh: mobile browser bars must not break the layout. */
-body {
-  height: 100svh;
-  overflow: hidden;
-  background: var(--fallback-bg);
-  overscroll-behavior: none;
+h1,
+h2,
+h3,
+p,
+figure {
+  margin: 0;
+}
+
+button {
+  font-family: inherit;
 }
 
 .app {
-  position: fixed;
-  inset: 0;
-  height: 100svh;
-  background: var(--fallback-bg);
+  position: relative;
 }
+
+/* --- Fixed 3D layer ------------------------------------------------------ */
 
 .backdrop {
   position: fixed;
@@ -56,20 +72,63 @@ body {
   position: fixed;
   inset: 0;
   z-index: 1;
+  /* Never let the canvas swallow a scroll gesture. */
+  pointer-events: none;
 }
 
 .scene canvas {
   display: block;
-  touch-action: pan-y;
 }
 
-button {
-  font-family: inherit;
+/* --- Scrolling content --------------------------------------------------- */
+
+.page {
+  position: relative;
+  z-index: 2;
+}
+
+.section {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 100svh;
+  padding: calc(var(--nav-h) + 24px) var(--pad) 48px;
+}
+
+.section__content {
+  max-width: 34rem;
+}
+
+/* Content pinned low, used wherever the glass owns the centre of the screen. */
+.section--bottom {
+  align-items: flex-end;
+  padding-bottom: 10svh;
+}
+
+@media (min-width: 768px) {
+  .section__content.is-right {
+    margin-left: auto;
+    text-align: right;
+  }
+}
+
+/* Mobile: text lives in the bottom half, the glass sits above it. */
+@media (max-width: 767px) {
+  .section {
+    align-items: flex-end;
+    padding-bottom: 12svh;
+  }
+
+  .section__content {
+    max-width: 100%;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .backdrop,
-  .picker__btn {
+  .picker__btn,
+  .contact__details,
+  .navbar__overlay {
     transition: none;
   }
 

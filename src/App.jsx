@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
+import Navbar from './ui/Navbar.jsx'
+import Hero from './ui/Hero.jsx'
+import FlavorSection from './ui/FlavorSection.jsx'
+import About from './ui/About.jsx'
+import Contact from './ui/Contact.jsx'
 import Scene from './three/Scene.jsx'
-import FlavorPicker from './ui/FlavorPicker.jsx'
-import { getFlavor } from './config/flavors.js'
+import { flavors, getFlavor } from './config/flavors.js'
 import { useStore } from './store/useStore.js'
+import { useLenis } from './hooks/useLenis.js'
+import { useScrollProgress } from './hooks/useScrollProgress.js'
 
 export default function App() {
   const activeFlavor = useStore((state) => state.activeFlavor)
@@ -12,6 +18,9 @@ export default function App() {
   const [previousGradient, setPreviousGradient] = useState(null)
   const previousRef = useRef(null)
   const gradientRef = useRef(flavor.backgroundGradient)
+
+  useLenis()
+  useScrollProgress()
 
   // Cross-fade the backdrop instead of hard-cutting between flavors.
   useEffect(() => {
@@ -51,7 +60,22 @@ export default function App() {
       <div className="backdrop" style={{ backgroundImage: gradient }} />
 
       <Scene />
-      <FlavorPicker />
+      <Navbar />
+
+      <main className="page">
+        <Hero />
+
+        {flavors.map((flavorItem, index) => (
+          <FlavorSection
+            key={flavorItem.id}
+            flavor={flavorItem}
+            index={index + 1}
+          />
+        ))}
+
+        <About />
+        <Contact />
+      </main>
     </div>
   )
 }

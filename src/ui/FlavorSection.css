@@ -1,0 +1,74 @@
+.flavor__index {
+  margin-bottom: 10px;
+  color: var(--flavor-accent);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.flavor__name {
+  color: var(--flavor-accent);
+  font-size: clamp(44px, 13vw, 96px);
+  font-weight: 750;
+  letter-spacing: -0.035em;
+  line-height: 0.92;
+}
+
+.flavor__tagline {
+  max-width: 26rem;
+  margin-top: 14px;
+  color: var(--ink);
+  font-size: clamp(17px, 4.4vw, 22px);
+  line-height: 1.35;
+  text-wrap: balance;
+}
+
+.flavor__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 26px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 44px;
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.chip__label {
+  color: var(--ink-soft);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.chip__value {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@media (min-width: 768px) {
+  .flavor__chips {
+    max-width: 30rem;
+  }
+
+  .flavor__content.is-right .flavor__chips {
+    justify-content: flex-end;
+  }
+
+  .flavor__content.is-right .flavor__tagline {
+    margin-left: auto;
+  }
+}
