@@ -1,0 +1,59 @@
+/* Fixed background layer: a flavor gradient plus soft out-of-focus blobs.
+   Kept behind the canvas (z-index 0) and never interactive. */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* The outgoing flavor rides on top of the incoming one and fades away, so the
+   new mood is already in place underneath it. `forwards` holds it at zero until
+   its animationend handler unmounts it. */
+.backdrop--previous {
+  z-index: 1;
+  animation: backdrop-out 700ms ease forwards;
+}
+
+@keyframes backdrop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Radial gradients rather than `filter: blur()` on a solid: a gradient is
+   rasterised once by the compositor, whereas a large blurred layer has to be
+   filtered every frame on the GPU. This is the cheap way to get bokeh. */
+.backdrop__bokeh {
+  position: absolute;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: bokeh-drift 19s ease-in-out infinite alternate;
+}
+
+@keyframes bokeh-drift {
+  from {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  to {
+    transform: translate(-46%, -55%) scale(1.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Not `animation: none`: the layer would then sit at full opacity until it
+     unmounts and the old flavor would linger. Instead the fade is made
+     instant, so the switch is a clean cut. */
+  .backdrop--previous {
+    animation-duration: 1ms;
+  }
+
+  .backdrop__bokeh {
+    animation: none;
+  }
+}

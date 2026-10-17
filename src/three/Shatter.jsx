@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { isMobile } from '../config/performance.js'
+import { glassModel, shardSpawns } from '../config/glassProfile.js'
+import { quality } from '../config/performance.js'
 import { useStore } from '../store/useStore.js'
 import { createGlassMaterial } from './shaders/glassMaterial.js'
 import {
@@ -43,9 +44,15 @@ function buildShardGeometry(count) {
 
 export default function Shatter() {
   const meshRef = useRef(null)
-  const count = isMobile ? 40 : 60
+  const count = quality.shardCount
 
-  const shards = useMemo(() => buildShards(count), [count])
+  // Origins come from points measured on the glass, so the burst starts on the
+  // surface. Sizes, speeds and gravity scale with the glass's width, so the
+  // burst keeps its proportions if the model is swapped.
+  const shards = useMemo(
+    () => buildShards(count, { spawns: shardSpawns, width: glassModel.widestRadius * 2 }),
+    [count],
+  )
   const geometry = useMemo(() => buildShardGeometry(count), [count])
   const material = useMemo(() => createGlassMaterial({ instanceFade: true }), [])
 

@@ -12,6 +12,7 @@
  * @property {string} liquidColor        Liquid color, hex.
  * @property {string} accentColor        UI accent for this flavor, hex.
  * @property {string} backgroundGradient Full CSS background-image value.
+ * @property {number[][]} bokeh          Out-of-focus blobs: [x%, y%, sizeVmax, alpha].
  * @property {string} tagline            One short line of copy.
  * @property {FlavorProperty[]} properties  Exactly three chips.
  */
@@ -24,6 +25,13 @@ export const flavors = [
     accentColor: '#5F8A00',
     backgroundGradient:
       'linear-gradient(180deg, #F6FFDE 0%, #D2F261 55%, #97CA20 100%)',
+    bokeh: [
+      [14, 16, 54, 0.5],
+      [84, 12, 42, 0.34],
+      [70, 76, 58, 0.3],
+      [20, 88, 38, 0.26],
+      [48, 44, 30, 0.16],
+    ],
     tagline: 'Sharp enough to wake you up.',
     properties: [
       { label: 'Taste', value: 'Sharp citrus' },
@@ -38,6 +46,13 @@ export const flavors = [
     accentColor: '#C9184A',
     backgroundGradient:
       'linear-gradient(180deg, #FFF0F3 0%, #FFB6C4 55%, #FF5C8A 100%)',
+    bokeh: [
+      [78, 20, 50, 0.46],
+      [16, 10, 40, 0.3],
+      [26, 78, 60, 0.32],
+      [86, 70, 36, 0.24],
+      [56, 48, 26, 0.18],
+    ],
     tagline: 'Summer, muddled.',
     properties: [
       { label: 'Taste', value: 'Soft and sweet' },
@@ -52,6 +67,13 @@ export const flavors = [
     accentColor: '#1E7A2E',
     backgroundGradient:
       'linear-gradient(180deg, #EFFBEF 0%, #B9E7A9 55%, #6CCB57 100%)',
+    bokeh: [
+      [10, 62, 52, 0.42],
+      [88, 34, 44, 0.32],
+      [44, 12, 34, 0.28],
+      [72, 88, 46, 0.24],
+      [34, 40, 28, 0.15],
+    ],
     tagline: 'Crisp enough to hear.',
     properties: [
       { label: 'Taste', value: 'Dry, green crunch' },
@@ -66,6 +88,13 @@ export const flavors = [
     accentColor: '#C25E00',
     backgroundGradient:
       'linear-gradient(180deg, #FFF7E6 0%, #FFD98A 55%, #FFA51F 100%)',
+    bokeh: [
+      [50, 14, 62, 0.44],
+      [18, 46, 40, 0.3],
+      [86, 58, 48, 0.32],
+      [64, 90, 36, 0.22],
+      [30, 80, 26, 0.16],
+    ],
     tagline: 'Thick sun, poured slow.',
     properties: [
       { label: 'Taste', value: 'Thick and tropical' },

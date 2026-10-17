@@ -5,11 +5,24 @@ import * as THREE from 'three'
  * keeps accumulated state, which is the whole reason the burst rewinds
  * exactly when the user scrolls back up: every value is a function of
  * breakProgress alone.
+ *
+ * Coordinates. The shards are siblings of the glass inside one group, so they
+ * share the glass's local space: y runs 0 at the base to 1 at the rim, centred
+ * on x/z. Phase 3B put shard origins at y -0.39..0.39, which is a *centred*
+ * space; the glass is not, so half the burst started below the glass and the
+ * rest entered it from underneath. Origins now come from points measured on
+ * the real mesh (config/glassProfile.js), which are already in this space.
+ *
+ * Scale. Sizes, speeds and gravity are all multiplied by the glass's width, so
+ * the burst keeps its proportions if the model is replaced.
  */
 
 /** breakProgress at which the intact glass swaps for the shards. */
 export const BREAK_START = 0.3
-export const GRAVITY = -1.15
+
+/** Downward acceleration per unit of glass width, per unit of t squared. */
+export const GRAVITY_PER_WIDTH = -1.15
+
 export const MAX_DELAY = 0.22
 
 /** @param {number} value */
@@ -29,18 +42,35 @@ export function makeRandom(seed) {
 }
 
 /**
- * Precomputed once per scene: origin inside the glass, launch direction,
- * speed, spin axis and rate, size, and stagger delay.
+ * Precomputed once per scene: origin on the glass surface, launch direction,
+ * speed, spin axis and rate, size, stagger delay, and the gravity that applies
+ * to this shard.
+ *
  * @param {number} count
- * @param {number} [seed]
+ * @param {object} [options]
+ * @param {number[][]} [options.spawns]  Surface points in glass local space.
+ * @param {number} [options.width]       Glass width (diameter) in local units.
+ * @param {number} [options.seed]
  */
-export function buildShards(count, seed = 20261018) {
+export function buildShards(count, { spawns = [[0, 0.5, 0]], width = 1, seed = 20261018 } = {}) {
   const random = makeRandom(seed)
   const shards = []
 
   for (let i = 0; i < count; i++) {
-    const angle = random() * Math.PI * 2
-    const radius = 0.08 + random() * 0.3
+    // Spread the picks evenly over the spawn list rather than repeating the
+    // first `count` entries, so mobile (fewer shards) still covers the glass.
+    const source = spawns[Math.floor((i * spawns.length) / count)]
+
+    const origin = new THREE.Vector3(source[0], source[1], source[2])
+
+    // Blow outward from the axis. Shards picked near the stem sit on the axis,
+    // where there is no radial direction to use, so those get a random heading.
+    const fallbackAngle = random() * Math.PI * 2
+    const radial = new THREE.Vector3(origin.x, 0, origin.z)
+    if (radial.lengthSq() < 1e-8) {
+      radial.set(Math.cos(fallbackAngle), 0, Math.sin(fallbackAngle))
+    }
+    radial.normalize()
 
     const axis = new THREE.Vector3(
       random() - 0.5,
@@ -52,22 +82,19 @@ export function buildShards(count, seed = 20261018) {
     axis.normalize()
 
     shards.push({
-      origin: new THREE.Vector3(
-        Math.cos(angle) * radius,
-        (random() - 0.5) * 0.78,
-        Math.sin(angle) * radius,
-      ),
+      origin,
       // Outward and upward, so the burst opens away from the glass.
       dir: new THREE.Vector3(
-        Math.cos(angle) * (0.6 + random() * 0.7),
+        radial.x * (0.6 + random() * 0.7),
         0.35 + random() * 0.9,
-        Math.sin(angle) * (0.6 + random() * 0.7),
+        radial.z * (0.6 + random() * 0.7),
       ).normalize(),
-      speed: 0.9 + random() * 1.5,
+      speed: width * (1.4 + random() * 2.2),
       axis,
       spin: (random() - 0.5) * 9,
-      scale: 0.22 + random() * 0.34,
+      scale: width * (0.14 + random() * 0.22),
       delay: random() * MAX_DELAY,
+      gravity: GRAVITY_PER_WIDTH * width,
     })
   }
 
@@ -90,7 +117,7 @@ export const shardTi = (shard, t) =>
  */
 export function shardDisplacement(shard, ti, out) {
   out.copy(shard.origin).addScaledVector(shard.dir, shard.speed * ti)
-  out.y += 0.5 * GRAVITY * ti * ti
+  out.y += 0.5 * shard.gravity * ti * ti
   return out
 }
 

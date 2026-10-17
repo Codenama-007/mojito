@@ -2,19 +2,64 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { getFlavor } from '../config/flavors.js'
+import { interiorProfile } from '../config/glassProfile.js'
+import { quality } from '../config/performance.js'
 import { useStore } from '../store/useStore.js'
 import { liquidFragment, liquidVertex } from './shaders/liquid.js'
 
-/** Interior of the glass: floor at 0.14, open to 1.0, so 0.86 tall. */
-const INTERIOR_HEIGHT = 0.86
-const INTERIOR_RADIUS = 0.443
-const FLOOR_Y = 0.14
-const DEFAULT_FILL = 0.8
+/** How full the bowl is, as a fraction of its interior height. */
+const FILL = 0.8
+
+/**
+ * The liquid is built at this fraction of the bowl's interior radius. The
+ * glass wall is about 0.01 thick at the rim, so a little clearance reads as
+ * wall thickness; with none, the surface z-fights the glass where the two
+ * nearly touch.
+ */
+const CLEARANCE = 0.92
 
 /** Time constant for the flavor color blend. ~95% settled at 3x, i.e. 0.6s. */
 const COLOR_LERP_TAU = 0.2
 
-export default function Liquid({ radialSegments = 48 }) {
+/**
+ * The bowl's interior, inset and cut off at the fill line, then closed with a
+ * floor disc and a flat surface so the solid is watertight.
+ *
+ * The profile is measured, not guessed: the bowl is widest just below its
+ * middle (0.20127) and narrower at the rim (0.14518), which is exactly why a
+ * cylinder cannot sit inside it. FILL is applied by truncating the profile
+ * rather than by scaling the mesh, so the wall stays on the glass at every
+ * height.
+ */
+function buildLiquidProfile(fill) {
+  const floorY = interiorProfile[0][1]
+  const rimY = interiorProfile[interiorProfile.length - 1][1]
+  const topY = floorY + (rimY - floorY) * fill
+
+  const points = [new THREE.Vector2(0, floorY)]
+
+  for (let i = 1; i < interiorProfile.length; i++) {
+    const [radius, y] = interiorProfile[i]
+
+    if (y >= topY) {
+      // Interpolate the wall to land exactly on the fill line.
+      const [previousRadius, previousY] = interiorProfile[i - 1]
+      const t = (topY - previousY) / (y - previousY)
+      const radiusAtTop = previousRadius + (radius - previousRadius) * t
+      points.push(new THREE.Vector2(radiusAtTop * CLEARANCE, topY))
+      break
+    }
+
+    points.push(new THREE.Vector2(radius * CLEARANCE, y))
+  }
+
+  // Watertight: close the surface across to the axis.
+  points.push(new THREE.Vector2(0, topY))
+
+  return { points, floorY, topY }
+}
+
+export default function Liquid({ segments = quality.latheSegments }) {
   const meshRef = useRef(null)
   const activeFlavor = useStore((state) => state.activeFlavor)
   const targetColor = useRef(null)
@@ -25,19 +70,14 @@ export default function Liquid({ radialSegments = 48 }) {
     )
   }
 
-  const geometry = useMemo(() => {
-    const geo = new THREE.CylinderGeometry(
-      INTERIOR_RADIUS,
-      INTERIOR_RADIUS,
-      INTERIOR_HEIGHT,
-      radialSegments,
-      12,
-    )
-    // Lift the base to y=0 so uFill scales the column up from the floor
-    // rather than shrinking it toward its own midpoint.
-    geo.translate(0, INTERIOR_HEIGHT / 2, 0)
-    return geo
-  }, [radialSegments])
+  const { geometry, floorY, topY } = useMemo(() => {
+    const profile = buildLiquidProfile(FILL)
+    return {
+      geometry: new THREE.LatheGeometry(profile.points, segments),
+      floorY: profile.floorY,
+      topY: profile.topY,
+    }
+  }, [segments])
 
   const material = useMemo(
     () =>
@@ -49,12 +89,13 @@ export default function Liquid({ radialSegments = 48 }) {
             ),
           },
           uTime: { value: 0 },
-          uFill: { value: DEFAULT_FILL },
+          uFloorY: { value: floorY },
+          uTopY: { value: topY },
         },
         vertexShader: liquidVertex,
         fragmentShader: liquidFragment,
       }),
-    [],
+    [floorY, topY],
   )
 
   useEffect(() => {
@@ -80,13 +121,6 @@ export default function Liquid({ radialSegments = 48 }) {
     uniforms.uColor.value.lerp(targetColor.current, step)
   })
 
-  return (
-    <mesh
-      ref={meshRef}
-      geometry={geometry}
-      material={material}
-      position={[0, FLOOR_Y, 0]}
-      renderOrder={1}
-    />
-  )
+  // The profile already carries real heights, so the mesh sits at the origin.
+  return <mesh ref={meshRef} geometry={geometry} material={material} renderOrder={1} />
 }

@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { glassModel, interiorProfile, shardSpawns } from '../src/config/glassProfile.js'
 import {
   BREAK_START,
   buildShards,
@@ -19,7 +20,8 @@ const check = (name, ok, detail = '') => {
   }
 }
 
-const shards = buildShards(60)
+const WIDTH = glassModel.widestRadius * 2
+const shards = buildShards(60, { spawns: shardSpawns, width: WIDTH })
 const out = new THREE.Vector3()
 const quat = new THREE.Quaternion()
 
@@ -27,32 +29,24 @@ const quat = new THREE.Quaternion()
 // Sweep up, then sweep down, and compare every shard at the same breakProgress.
 const STEPS = 200
 
+const sampleAt = (bp) =>
+  shards.map((shard) => {
+    const ti = shardTi(shard, progressToT(bp))
+    const pos = shardDisplacement(shard, ti, new THREE.Vector3()).toArray()
+    const rot = shardRotation(shard, ti, new THREE.Quaternion()).toArray()
+    return [...pos, ...rot, shardFade(ti)]
+  })
+
 const sampleUp = []
 for (let i = 0; i <= STEPS; i++) {
   const bp = i / STEPS
-  sampleUp.push({
-    bp,
-    transforms: shards.map((shard) => {
-      const ti = shardTi(shard, progressToT(bp))
-      const pos = shardDisplacement(shard, ti, new THREE.Vector3()).toArray()
-      const rot = shardRotation(shard, ti, new THREE.Quaternion()).toArray()
-      return [...pos, ...rot, shardFade(ti)]
-    }),
-  })
+  sampleUp.push({ bp, transforms: sampleAt(bp) })
 }
 
 const sampleDown = []
 for (let i = STEPS; i >= 0; i--) {
   const bp = i / STEPS
-  sampleDown.push({
-    bp,
-    transforms: shards.map((shard) => {
-      const ti = shardTi(shard, progressToT(bp))
-      const pos = shardDisplacement(shard, ti, new THREE.Vector3()).toArray()
-      const rot = shardRotation(shard, ti, new THREE.Quaternion()).toArray()
-      return [...pos, ...rot, shardFade(ti)]
-    }),
-  })
+  sampleDown.push({ bp, transforms: sampleAt(bp) })
 }
 
 // sampleDown is reversed relative to sampleUp; align by breakProgress.
@@ -99,8 +93,11 @@ check('t is 0 at the break point', tAtBreak === 0, `t=${tAtBreak}`)
 check('t is 0 just before the break', tBeforeBreak === 0, `t=${tBeforeBreak}`)
 check('t is 1 at the end', progressToT(1) === 1)
 
-// Shards must start inside the glass, but the glass is a cylinder: the radial
-// constraint and the vertical constraint have to be checked separately.
+// ------------------------------------------------------------- spawn locations
+// The glass is not centred on its origin: its local space runs y 0 (base) to
+// 1 (rim). The shards are siblings of the glass, so they share that space. An
+// earlier version spawned them at y -0.39..0.39, and the assertion here agreed
+// with it, so the burst came out of the floor and nothing caught it.
 let worstRadial = 0
 let minY = Infinity
 let maxY = -Infinity
@@ -110,15 +107,67 @@ for (const shard of shards) {
   minY = Math.min(minY, y)
   maxY = Math.max(maxY, y)
 }
+
 check(
-  'shard origins stay inside the glass wall',
-  worstRadial <= 0.445,
-  `max radial ${worstRadial.toFixed(3)} vs interior 0.445`,
+  'shard origins sit on or inside the glass surface',
+  worstRadial <= glassModel.widestRadius + 1e-6,
+  `max radial ${worstRadial.toFixed(5)} vs widest ${glassModel.widestRadius.toFixed(5)}`,
 )
 check(
   'shard origins stay within the glass height',
-  minY >= -0.5 && maxY <= 0.5,
+  minY >= 0 && maxY <= 1,
   `y range ${minY.toFixed(3)} to ${maxY.toFixed(3)}`,
+)
+check(
+  'the burst spans the whole glass, not one end of it',
+  maxY - minY > 0.5,
+  `y spread ${(maxY - minY).toFixed(3)} of 1.0`,
+)
+check(
+  'every shard starts on the mesh, not in empty space',
+  worstRadial > glassModel.widestRadius * 0.3,
+  `furthest origin ${worstRadial.toFixed(5)} from the axis`,
+)
+
+// Origins must be points that were actually measured on the glass.
+const spawnSet = new Set(shardSpawns.map((p) => p.map((v) => v.toFixed(6)).join(',')))
+let unmatched = 0
+for (const shard of shards) {
+  const key = [shard.origin.x, shard.origin.y, shard.origin.z]
+    .map((v) => v.toFixed(6))
+    .join(',')
+  if (!spawnSet.has(key)) unmatched++
+}
+check(
+  'every shard origin is a measured surface point',
+  unmatched === 0,
+  `${shardSpawns.length} measured points, ${unmatched} unmatched`,
+)
+
+// ------------------------------------------------------------------- profile
+let monotoneUp = true
+let monotoneDown = true
+let widestAt = 0
+for (let i = 1; i < interiorProfile.length; i++) {
+  const [radius, y] = interiorProfile[i]
+  const [previousRadius, previousY] = interiorProfile[i - 1]
+  if (y <= previousY) monotoneUp = false
+  if (radius > interiorProfile[widestAt][0]) widestAt = i
+}
+for (let i = widestAt + 1; i < interiorProfile.length; i++) {
+  if (interiorProfile[i][0] >= interiorProfile[i - 1][0]) monotoneDown = false
+}
+const interiorMax = Math.max(...interiorProfile.map((p) => p[0]))
+check('interior profile rises then falls, with no stray ring', monotoneUp && monotoneDown)
+check(
+  'interior stays inside the outer silhouette',
+  interiorMax < glassModel.widestRadius,
+  `interior ${interiorMax.toFixed(5)} < outer ${glassModel.widestRadius.toFixed(5)}`,
+)
+check(
+  'the bowl is narrower at the rim than at its middle',
+  interiorProfile[interiorProfile.length - 1][0] < interiorMax,
+  `rim ${interiorProfile[interiorProfile.length - 1][0].toFixed(5)} vs middle ${interiorMax.toFixed(5)}`,
 )
 
 // ------------------------------------------------------------------- staggering
@@ -135,10 +184,12 @@ check(
   shards.every((shard) => shardTi(shard, 1) === 1),
 )
 
-// ------------------------------------------------------------------------ sane
+// -------------------------------------------------------------- burst scale
 let finite = true
 let maxTravel = 0
+let maxShardSize = 0
 for (const shard of shards) {
+  maxShardSize = Math.max(maxShardSize, shard.scale)
   for (let i = 0; i <= STEPS; i++) {
     const ti = shardTi(shard, i / STEPS)
     shardDisplacement(shard, ti, out)
@@ -152,9 +203,15 @@ for (const shard of shards) {
 }
 check('no NaN anywhere in the burst', finite)
 check(
-  'travel stays within a sane multiple of glass size',
+  'travel stays within a sane multiple of glass height',
   maxTravel < 6,
-  `max distance ${maxTravel.toFixed(2)} glass-height units`,
+  `max distance ${maxTravel.toFixed(2)} of 1.0`,
+)
+// The shard triangle spans about 1 unit across, so its scale is its width.
+check(
+  'no shard is larger than the glass it came from',
+  maxShardSize < WIDTH,
+  `largest shard ${maxShardSize.toFixed(3)} vs glass width ${WIDTH.toFixed(3)}`,
 )
 
 // Quaternions must stay unit length, or instances render scaled/sheared.

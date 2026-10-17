@@ -1,36 +1,43 @@
 /**
  * Liquid shader. Two passes over the data:
- *   vertex   - scales the column by uFill, then ripples only the top surface
- *   fragment - lighter at the top of the column, darker at the bottom,
- *              with one cheap lambert term so the cylinder reads as round
+ *   vertex   - ripples the surface only, leaving the wall exactly on the
+ *              profile it was built from
+ *   fragment - lighter at the surface, darker at the bottom, with one cheap
+ *              lambert term so the bowl reads as round
  *
- * vUv.y runs 0 at the bottom of the column to 1 at the top, so the vertical
- * gradient needs no magic height constant.
+ * The liquid is a lathe on the bowl's measured interior profile, so its shape
+ * is already correct and the fill level is baked into the geometry. Phase 2
+ * scaled the column with a uFill uniform, which only worked because the old
+ * glass was a straight cylinder; on a tapered bowl the same trick moves the
+ * wall sideways and pokes it through the glass.
+ *
+ * vFrac runs 0 at the floor to 1 at the surface.
  */
 
 export const liquidVertex = /* glsl */ `
   uniform float uTime;
-  uniform float uFill;
+  uniform float uFloorY;
+  uniform float uTopY;
 
   varying vec3 vViewPos;
   varying vec3 vNormalV;
-  varying vec2 vUv;
+  varying float vFrac;
 
   void main() {
-    vUv = uv;
-
     vec3 transformed = position;
 
-    // Compress the column from its base. The interior wall is a vertical
-    // cylinder, so the radius is safe at every fill level.
-    transformed.y *= uFill;
+    float frac = clamp((transformed.y - uFloorY) / (uTopY - uFloorY), 0.0, 1.0);
 
-    // Ripple only the top surface, fading in over the last third.
-    float topMask = smoothstep(0.55, 1.0, uv.y);
+    // Ripple the surface only. The frequencies are scaled up from Phase 2
+    // because this bowl is roughly half the width of the old cylinder, and the
+    // wave is a function of x/z, so a narrower bowl would show fewer waves.
+    float topMask = smoothstep(0.82, 1.0, frac);
     float wave =
-      sin(transformed.x * 9.0 + uTime * 1.6) * 0.007 +
-      sin(transformed.z * 7.0 - uTime * 1.2) * 0.005;
+      sin(transformed.x * 20.0 + uTime * 1.6) * 0.0035 +
+      sin(transformed.z * 16.0 - uTime * 1.2) * 0.0025;
     transformed.y += wave * topMask;
+
+    vFrac = frac;
 
     vec4 mvPosition = modelViewMatrix * vec4(transformed, 1.0);
     vViewPos = -mvPosition.xyz;
@@ -42,18 +49,16 @@ export const liquidVertex = /* glsl */ `
 
 export const liquidFragment = /* glsl */ `
   uniform vec3 uColor;
-  uniform float uTime;
-  uniform float uFill;
 
   varying vec3 vViewPos;
   varying vec3 vNormalV;
-  varying vec2 vUv;
+  varying float vFrac;
 
   void main() {
     vec3 lighter = uColor * 1.18;
     vec3 darker = uColor * 0.6;
 
-    vec3 base = mix(darker, lighter, vUv.y * vUv.y);
+    vec3 base = mix(darker, lighter, vFrac * vFrac);
 
     vec3 N = normalize(vNormalV);
     vec3 V = normalize(vViewPos);
