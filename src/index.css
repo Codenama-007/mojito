@@ -1,0 +1,79 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:root {
+  --ink: #16210f;
+  --picker-surface: rgba(255, 255, 255, 0.78);
+  --picker-border: rgba(22, 33, 15, 0.16);
+  --fallback-bg: #d2f261;
+
+  --sans: system-ui, 'Segoe UI', Roboto, -apple-system, sans-serif;
+
+  font-family: var(--sans);
+  color: var(--ink);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/* 100svh, not 100vh: mobile browser bars must not break the layout. */
+body {
+  height: 100svh;
+  overflow: hidden;
+  background: var(--fallback-bg);
+  overscroll-behavior: none;
+}
+
+.app {
+  position: fixed;
+  inset: 0;
+  height: 100svh;
+  background: var(--fallback-bg);
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  transition: opacity 700ms ease;
+}
+
+.backdrop--previous {
+  opacity: 1;
+}
+
+.scene {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+}
+
+.scene canvas {
+  display: block;
+  touch-action: pan-y;
+}
+
+button {
+  font-family: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .picker__btn {
+    transition: none;
+  }
+
+  .picker__btn:active {
+    transform: none;
+  }
+}

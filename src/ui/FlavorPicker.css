@@ -1,0 +1,54 @@
+.picker {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  padding: 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+.picker__btn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid var(--picker-border);
+  background: var(--picker-surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color 220ms ease,
+    color 220ms ease,
+    border-color 220ms ease,
+    transform 120ms ease;
+}
+
+.picker__btn:hover {
+  border-color: var(--btn-accent);
+}
+
+.picker__btn:active {
+  transform: scale(0.96);
+}
+
+.picker__btn.is-active {
+  background: var(--btn-accent);
+  border-color: transparent;
+  color: #fff;
+}
+
+.picker__btn:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
