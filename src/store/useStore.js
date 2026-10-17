@@ -4,18 +4,19 @@ import { qualityTier } from '../config/performance.js'
 import { HERO_ID } from '../config/sections.js'
 
 /**
- * Small global state only: active flavor, active section, scroll progress,
+ * Small global state only: active flavor, active section, scroll values,
  * quality tier. Anything flavor-specific (colors, copy) stays in
  * config/flavors.js.
  *
- * scrollProgress is written imperatively by ScrollTrigger callbacks and read
- * inside useFrame via getState(). Nothing subscribes to it, so a scroll frame
- * never triggers a React render.
+ * scrollProgress and breakProgress are written imperatively by ScrollTrigger
+ * callbacks and read inside useFrame via getState(). Nothing subscribes to
+ * them, so a scroll frame never triggers a React render.
  */
 export const useStore = create((set) => ({
   activeFlavor: defaultFlavor.id,
   activeSection: HERO_ID,
   scrollProgress: 0,
+  breakProgress: 0,
   qualityTier,
 
   /** @param {string} id Flavor id from config/flavors.js */
@@ -32,4 +33,7 @@ export const useStore = create((set) => ({
 
   /** @param {number} value Scroll progress, 0 to 1 */
   setScrollProgress: (value) => set({ scrollProgress: value }),
+
+  /** @param {number} value Shatter progress, 0 to 1 */
+  setBreakProgress: (value) => set({ breakProgress: value }),
 }))

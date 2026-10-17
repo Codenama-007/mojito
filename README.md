@@ -66,12 +66,15 @@ src/
     Scene.jsx            <- Canvas, lights, camera, glass choreography
     Glass.jsx            <- LatheGeometry glass
     Liquid.jsx           <- custom shader liquid
+    Shatter.jsx          <- 60 (40 mobile) shards, one InstancedMesh
+    shardMath.js         <- pure, reversible shard maths
     Ice.jsx              <- not built yet
     Mint.jsx             <- not built yet
     Fruit.jsx            <- not built yet
     Bubbles.jsx          <- not built yet
     shaders/
       liquid.js          <- liquid vertex + fragment
+      glassMaterial.js   <- shared glass material, optional per-instance fade
   ui/
     Navbar.jsx           <- fixed bar, hamburger overlay under 768px
     Hero.jsx             <- headline + flavor picker
@@ -88,6 +91,8 @@ src/
     useAdaptiveQuality.js<- not built yet
   assets/                <- compressed models and textures only
 public/
+scripts/
+  verify-shatter.mjs     <- reversal + sanity checks for the shard maths
 ```
 
 ## Contact details are placeholders
@@ -114,12 +119,30 @@ Rendering stops while the tab is hidden. Smooth scroll is Lenis, driven by the
 GSAP ticker so the page has a single rAF loop. Lenis honours
 `prefers-reduced-motion` by collapsing to 1:1 scroll.
 
+## The shatter
+
+Approaching the contact section, `breakProgress` runs 0 to 1, scrubbed by
+ScrollTrigger. The glass drops and shakes up to 0.3, then the intact glass and
+liquid hide and 60 shards (40 on mobile) appear in their place, flying outward,
+falling and fading to nothing.
+
+Nothing integrates velocity over time. Every shard's position, rotation and
+alpha is a closed-form function of `breakProgress`, which is what makes
+scrolling back up reassemble the glass exactly rather than leaving it
+scattered. `scripts/verify-shatter.mjs` asserts that reversal over 200 scroll
+steps, plus alpha monotonicity, finite values, unit-length rotation
+quaternions, and that shard origins start inside the glass:
+
+```powershell
+pnpm verify
+```
+
 ## Phase status
 
 - [x] 1. Setup, canvas, test cube, flavor picker
 - [x] 2. Glass and liquid shader
 - [x] 3A. Navbar and scroll journey
-- [ ] 3B. Glass shatter and contact details
+- [x] 3B. Glass shatter and contact details
 - [ ] 4. Scroll story: ice, mint, fruit, bubbles
 - [ ] 5. Mobile optimization pass
 - [ ] 6. Loader, SEO, deploy to Vercel

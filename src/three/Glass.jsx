@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
+import { createGlassMaterial } from './shaders/glassMaterial.js'
 
 /**
  * Highball glass, built as a LatheGeometry from a hand-written profile.
@@ -23,8 +24,6 @@ const PROFILE = [
   [0.0, 0.14], // interior floor, sits on a 0.14-thick base
 ]
 
-const RIM_COLOR = new THREE.Color('#ffffff')
-
 function buildGeometry(segments) {
   const points = PROFILE.map(([x, y]) => new THREE.Vector2(x, y))
   const geometry = new THREE.LatheGeometry(points, segments)
@@ -32,49 +31,9 @@ function buildGeometry(segments) {
   return geometry
 }
 
-/**
- * Grazing angles glow, which is what sells glass without an environment map
- * or real refraction. Injected after <emissivemap_fragment>, where the
- * shading normal and view vector are both already in scope.
- */
-function addFresnelRim(material) {
-  material.onBeforeCompile = (shader) => {
-    shader.uniforms.uRimColor = { value: RIM_COLOR }
-    shader.fragmentShader = shader.fragmentShader
-      .replace('void main() {', 'uniform vec3 uRimColor;\nvoid main() {')
-      .replace(
-        '#include <emissivemap_fragment>',
-        `#include <emissivemap_fragment>
-        float rimFresnel = pow(
-          1.0 - abs(dot(normalize(normal), normalize(vViewPosition))),
-          3.0
-        );
-        totalEmissiveRadiance += uRimColor * rimFresnel * 0.32;`,
-      )
-  }
-  return material
-}
-
 export default function Glass({ segments = 64 }) {
   const geometry = useMemo(() => buildGeometry(segments), [segments])
-
-  const material = useMemo(
-    () =>
-      addFresnelRim(
-        new THREE.MeshPhysicalMaterial({
-          color: new THREE.Color('#eef6ff'),
-          transparent: true,
-          opacity: 0.22,
-          roughness: 0.05,
-          metalness: 0,
-          clearcoat: 1,
-          clearcoatRoughness: 0.05,
-          side: THREE.DoubleSide,
-          depthWrite: false,
-        }),
-      ),
-    [],
-  )
+  const material = useMemo(() => createGlassMaterial(), [])
 
   useEffect(
     () => () => {

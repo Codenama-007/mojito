@@ -3,7 +3,10 @@ import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { useStore } from '../store/useStore.js'
 import { defaultFlavor } from '../config/flavors.js'
-import { SECTION_ORDER } from '../config/sections.js'
+import {
+  CONTACT_ID,
+  SECTION_ORDER,
+} from '../config/sections.js'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -65,6 +68,22 @@ export function useScrollProgress() {
           end: 'bottom center',
           onEnter: activate,
           onEnterBack: activate,
+        }),
+      )
+    }
+
+    // 3. Shatter progress, from the end of About to the centre of Contact.
+    //    scrubbed, so it runs backwards cleanly on the way up.
+    const contactEl = document.getElementById(CONTACT_ID)
+    if (contactEl) {
+      triggers.push(
+        ScrollTrigger.create({
+          trigger: contactEl,
+          start: 'top bottom',
+          end: 'center center',
+          scrub: true,
+          onUpdate: (self) =>
+            useStore.getState().setBreakProgress(self.progress),
         }),
       )
     }
