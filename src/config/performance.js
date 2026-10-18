@@ -37,11 +37,15 @@ export const toRadians = (degrees) => (degrees * Math.PI) / 180
  * than stood to attention, which is most of what stops it reading as a
  * product-render turntable.
  *
- * Z is the visible lean (the cup tips sideways across the screen); X tips it
- * towards the camera, which is what shows the lid's ellipse. In degrees, so
- * they can be nudged by eye.
+ * Z is the visible lean across the screen and X tips it towards the camera,
+ * which is what shows the lid's ellipse. In degrees, so they can be nudged by
+ * eye.
+ *
+ * Z is *negative* because Phase 8A asks for the cup to lean to the right: in
+ * three.js a positive Z rotation swings +X towards +Y, so it tips the top of
+ * the cup to the left, and the sign has to flip to lean it the other way.
  */
-export const CUP_TILT_Z = 10
+export const CUP_TILT_Z = -10
 export const CUP_TILT_X = 4
 
 /**
@@ -49,6 +53,31 @@ export const CUP_TILT_X = 4
  * out as the shatter approaches so the burst happens on a steady cup.
  */
 export const CUP_SWAY = 1.5
+
+/**
+ * Phase 8A. How much of the viewport height the whole cup may occupy — body,
+ * lid, straw and all — measured after the tilt.
+ *
+ * A ceiling, not a target: the cup is only ever scaled *down* to meet it, so
+ * the sections keep the sizes they were tuned to and this exists purely to stop
+ * the straw riding off the top of a short screen.
+ */
+export const CUP_FIT = { mobile: 0.62, desktop: 0.72 }
+
+/**
+ * Phase 8A. The closest the top of the straw may come to the top edge, as a
+ * fraction of the viewport height. The navbar is taller than this on most
+ * phones, so on mobile the navbar wins (see NAVBAR_HEIGHT_PX).
+ */
+export const CUP_TOP_CLEARANCE = 0.08
+
+/**
+ * The navbar's height in CSS pixels — `--nav-h` in index.css. Duplicated here
+ * only because the clamp works in world units and needs the conversion at the
+ * point of use; if the two ever disagree the navbar simply gets a little more
+ * room than it needs.
+ */
+export const NAVBAR_HEIGHT_PX = 64
 
 /**
  * How far down the screen the cup sits on mobile, as a fraction of the viewport
