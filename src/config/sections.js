@@ -12,8 +12,22 @@ export const HERO_ID = 'hero'
 export const ABOUT_ID = 'about'
 export const CONTACT_ID = 'contact'
 
+/** Section ids for the flavor sections are `flavor-<id>` throughout. */
+export const FLAVOR_SECTION_PREFIX = 'flavor-'
+
 /** @param {string} flavorId */
-export const flavorSectionId = (flavorId) => `flavor-${flavorId}`
+export const flavorSectionId = (flavorId) => `${FLAVOR_SECTION_PREFIX}${flavorId}`
+
+/**
+ * Whether a section id belongs to one of the four flavor stops.
+ *
+ * Phase 6A needs this to decide when to fire a juice splash, and a third copy
+ * of the 'flavor-' literal is exactly how the two get out of step.
+ *
+ * @param {string} sectionId
+ */
+export const isFlavorSection = (sectionId) =>
+  sectionId.startsWith(FLAVOR_SECTION_PREFIX)
 
 /** Desktop: glass parked to one side, text on the other. */
 const desktopSide = (side, rot) => ({ x: side * 0.2, y: 0, scale: 0.92, rot })

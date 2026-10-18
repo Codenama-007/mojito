@@ -1,16 +1,20 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { flavors } from '../config/flavors.js'
-import { prefersReducedMotion } from '../config/performance.js'
+import { prefersReducedMotion, quality } from '../config/performance.js'
 import { useStore } from '../store/useStore.js'
 import { buildFruit, disposeFruit } from './fruitModels.js'
 import { FRUIT_SPRING, REVEAL, revealAt } from './ingredientMath.js'
 
 /**
- * One slice per flavor, all four built up front and scaled in or out rather
- * than mounted and unmounted. That is what makes the flavor swap a scale
- * crossfade with no hard cut (the brief, item 5) and what lets the same slice
- * carry the scroll reveal from item 6.
+ * Two or three slices per flavor — and all four flavors — built up front and
+ * scaled in or out rather than mounted and unmounted. That is what makes the
+ * flavor swap a scale crossfade with no hard cut (the brief, item 5) and what
+ * lets the same fruit carry the scroll reveal from item 6.
+ *
+ * The slices are wedged against the wall in fruitModels.js. Phase 6A also yawed
+ * each group slowly about Y, which read as fruit drifting through the drink;
+ * wedged fruit does not drift, so that rotation is gone.
  *
  * The scale is a damped spring, so it overshoots a little on the way up and
  * settles in about half a second. It is not a closed-form function of scroll:
@@ -25,7 +29,7 @@ export default function Fruit() {
     () =>
       flavors.map((flavor) => ({
         id: flavor.id,
-        object: buildFruit(flavor.fruit),
+        object: buildFruit(flavor.fruit, quality.fruitSliceCount),
       })),
     [],
   )
@@ -61,7 +65,6 @@ export default function Fruit() {
       const scale = Math.max(spring.value, 0)
       node.scale.setScalar(scale)
       node.visible = scale > HIDDEN
-      node.rotation.y = prefersReducedMotion ? 0 : state.clock.elapsedTime * 0.12
     }
   })
 

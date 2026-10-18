@@ -58,29 +58,38 @@ src/
   config/
     flavors.js           <- ALL flavor data lives here
     brand.js             <- contact details (PLACEHOLDERS, see below)
-    sections.js          <- section order, nav links, glass targets
-    performance.js       <- quality tier, dpr cap, reduced-motion flag
-    glassProfile.js      <- GENERATED: measured glass profiles + shard points
+    sections.js          <- section order, nav links, cup targets
+    performance.js       <- quality tier, dpr cap, reduced-motion, cup lean
+    cupProfile.js        <- the cup, lid and straw, as numbers
   store/
     useStore.js          <- active flavor, section, scroll values, tier
   three/
     Scene.jsx            <- Canvas, lights, environment map, quality wiring
-    MojitoGroup.jsx      <- the glass choreography (drop, shake, sway, ease)
-    Glass.jsx            <- the loaded model, plus a lathe fallback
-    Liquid.jsx           <- custom shader liquid, lathe on the bowl interior
+    MojitoGroup.jsx      <- the cup choreography (drop, shake, sway, ease, fit)
+    Cup.jsx              <- cup, rim, lid, straw and highlight
+    cupGeometry.js       <- the lathes, spun from cupProfile.js
+    Liquid.jsx           <- custom shader liquid, lathe on the cup interior
     liquidProfile.js     <- the drink's bounds, in one place, as plain numbers
-    Ground.jsx           <- contact shadow under the glass (desktop only)
+    Ground.jsx           <- contact shadow under the cup (desktop only)
     Shatter.jsx          <- 60 (40 mobile) shards, one InstancedMesh
     shardMath.js         <- pure, reversible shard maths
-    Bubbles.jsx          <- 80 (40 mobile) bubbles, one InstancedMesh
-    Ice.jsx              <- 5 rounded cubes, one InstancedMesh
-    Mint.jsx             <- 8-10 leaves, one InstancedMesh, shape built in code
-    Fruit.jsx            <- one slice per flavor, cross-faded on flavor change
+    Bubbles.jsx          <- 80 (40 mobile) rising bubbles, one InstancedMesh
+    WallBubbles.jsx      <- 60 (30 mobile) clinging to the wall
+    Ice.jsx              <- 3 rounded cubes, one InstancedMesh
+    Mint.jsx             <- 24 (14 mobile) leaves, one InstancedMesh
+    leafGeometry.js      <- the serrated leaf outline, built in code
+    mintTexture.js       <- a 128 px canvas texture for the leaf veins
+    Fruit.jsx            <- 3 (2 mobile) slices, wedged against the wall
     fruitModels.js       <- the four slices, built from primitives
+    FlavorFruits.jsx     <- whole fruit orbiting the cup, cross-faded
+    wholeFruits.js       <- the whole-fruit meshes, built from primitives
+    wholeFruitMath.js    <- pure, reversible orbit maths
+    Splash.jsx           <- the juice burst that leaves the lid
+    splashMath.js        <- pure, closed-form ballistic maths
     ingredientMath.js    <- pure, reversible ingredient maths
     shaders/
       liquid.js          <- liquid vertex + fragment
-      glassMaterial.js   <- shared glass material, optional per-instance fade
+      plasticMaterial.js <- the one plastic recipe: cup, lid and shards
   ui/
     Backdrop.jsx         <- flavor gradient + CSS bokeh, cross-faded
     Navbar.jsx           <- fixed bar, hamburger overlay under 768px
@@ -96,16 +105,18 @@ src/
     useLenis.js          <- Lenis instance, GSAP ticker wiring
     useScrollProgress.js <- every ScrollTrigger -> store write
     useAdaptiveQuality.js<- FPS sampler, lowers dpr toward 1 under 45 FPS
-    useGlassBaseScale.js <- viewport-derived scale, shared by glass + shadow
+    useGlassBaseScale.js <- viewport-derived scale, shared by cup + shadow
   assets/                <- compressed models and textures only
 public/
-  models/glass.glb       <- 236 KB
+  images/glass.jpg       <- the owner's reference shot for the cup
   env/studio.hdr         <- 1.4 MB, environment map
-prompts/                 <- the owner's prompts, recorded verbatim
+prompts/                 <- the owner's prompts and session records
 scripts/
-  extract-glass-profile.mjs <- measures the GLB, writes config/glassProfile.js
-  verify-shatter.mjs        <- reversal + sanity checks for the shard maths
-  verify-ingredients.mjs    <- bounds + reversal checks for ice/mint/fruit/fizz
+  verify-shatter.mjs     <- reversal + sanity checks for the shard maths
+  verify-ingredients.mjs <- bounds + reversal checks for ice, mint, fruit, fizz
+  verify-whole-fruits.mjs<- orbit, clearance and cross-fade checks
+  verify-splash.mjs      <- ballistics, fade and colour checks
+  verify-cup-fit.mjs     <- the cup fits the screen in every section
 ```
 
 ## Contact details are placeholders
@@ -133,49 +144,64 @@ Rendering stops while the tab is hidden. Smooth scroll is Lenis, driven by the
 GSAP ticker so the page has a single rAF loop. Lenis honours
 `prefers-reduced-motion` by collapsing to 1:1 scroll.
 
-## The glass
+## The cup
 
-`public/models/glass.glb` is a stemmed glass: a wide foot, a thin stem, and a
-rounded bowl. It arrives at an arbitrary scale, so `Glass.jsx` measures its
-bounding box at load and fits it to exactly 1 unit tall with its base at y = 0,
-centred on x/z. That is the coordinate space everything else works in.
+Phase 7 replaced the stemmed glass with a clear plastic takeaway cup. There is no
+external model any more. `src/config/cupProfile.js` holds the whole thing as
+numbers — a tapered wall, a rolled rim, a domed lid with a straw hole, and the
+straw — and `cupGeometry.js` spins them into lathes. `public/models/glass.glb`
+and the script that measured it are gone, returning 236 KB of the asset budget.
 
-The bowl is **widest just below its middle (radius 0.2013) and narrower at the
-rim (0.1452)**, so a cylinder cannot sit inside it: it would either poke
-through the wall or leave a visible gap. The liquid is therefore a lathe on the
-bowl's measured interior profile, and the 80% fill level is applied by cutting
-the profile off partway up rather than by scaling the mesh — scaling a tapered
-bowl vertically moves its wall sideways.
+Everything still works in one coordinate space: y = 0 at the cup's base, y = 1 at
+the rim, the lid above that (base 1.018, crown 1.238) and the straw out to 1.488.
+The liquid, the ingredients, the whole fruit, the splash, the shatter and the
+section targets all still use that space, so Phase 7 changed the silhouette and
+nothing else.
 
-Rather than eyeball those numbers, `scripts/extract-glass-profile.mjs` reads the
-GLB and writes `src/config/glassProfile.js`:
+The cup is a **cone**, and that is the whole difficulty. It is widest at the mouth
+and narrowest at the floor, so an ingredient standing in the top half has less
+room at its foot than at its own height. Every bound is therefore asked for at
+the height that actually constrains the object, not the height it sits at — see
+`buildMint` and `maxSliceRadius` for the two places that bit. The drink is a lathe
+on the cup's interior profile at 85% fill, cut off partway up rather than scaled:
+scaling a tapered cup vertically moves its wall sideways.
 
-```powershell
-node scripts/extract-glass-profile.mjs
-```
+**Plastic, one recipe.** `shaders/plasticMaterial.js` covers the cup, the lid and
+the shards, so they can never disagree about what they are made of. Desktop is a
+`MeshPhysicalMaterial` at transmission 0.9, thickness 0.1, roughness 0.08, ior
+1.45, clearcoat 1. Mobile is `transparent` at opacity 0.2 with `depthWrite` off
+and both sides drawn, plus a stronger environment map — no transmission pass at
+all. There is no `MeshTransmissionMaterial` on either tier, and no
+post-processing.
 
-It emits the bowl's interior profile, the outer silhouette (used to build the
-fallback lathe shown while the model loads), and 60 points sampled from the
-real surface, which the shatter uses as shard origins. Every number is measured
-from the mesh; re-run it if the model is ever replaced. `Glass.jsx` warns in dev
-if the loaded model disagrees with that file.
+> **Known risk.** The page backdrop is CSS, so the scene behind the cup is empty
+> and a transmission pass samples clear black instead of the flavour gradient.
+> The desktop cup may therefore read dark against the backdrop. It is implemented
+> as briefed; `performance.plastic.transmission` is a single number to flip to 0
+> if it looks wrong on a real desktop screen.
 
-Two notes on the source file. It declares
-`KHR_materials_pbrSpecularGlossiness` as a *required* extension, which three has
-no implementation for, so `GLTFLoader` warns on every load; `Glass.jsx`
-registers an empty handler to keep the console clean, and replaces the
-material anyway because the file's own is solid black.
+**The tilt.** `MojitoGroup.jsx` nests three groups. The outer one carries
+position, uniform scale and yaw. The next centres the cup's own 0..1 body on the
+origin. The inner one carries the resting lean and the idle sway, and everything
+the cup is made of lives inside it — which is what keeps the drink level *in* the
+cup instead of sliding about inside it. Phase 8A set the lean to **−10° in Z**,
+negative so the top of the cup tips to the right, and 4° in X.
 
-Asset budget: the model is 236 KB and the environment map is 1.4 MB, which is
-1.7 MB of the 2 MB ceiling in AGENTS.md section 5 — about 0.3 MB left. That is
-why the backdrop is pure CSS: soft blobs are radial gradients, not blurred
-images.
+**The fit (Phase 8A).** The cup, lid and straw are measured once at load and again
+on resize with a `THREE.Box3`, at both extremes of the sway so the clamp holds
+while the cup rocks. The group is scaled *down* if it would fill more than 62% of
+the viewport height on mobile (72% desktop). Every frame the top of the straw is
+held at least 8% of the viewport below the top edge, or below the 64 px navbar on
+mobile, whichever is lower. Both use `useThree`'s viewport, so they follow the
+screen rather than assuming one. `scripts/verify-cup-fit.mjs` sweeps seven
+sections × three widths × 35 heights × both tiers and asserts the straw never
+crosses. `MOBILE_GLASS_Y_OFFSET` (0.11) still drops the whole journey on mobile,
+and the clamp runs after it.
 
-There is no transmission or refraction on either tier. The page backdrop is
-CSS, so the scene behind the glass is empty, and a transmission pass would
-sample clear black instead of the gradient the user actually sees. The glass
-reads as glass through opacity, clearcoat, the environment map and a fresnel
-rim injected into the physical shader.
+Asset budget: the environment map is 1.4 MB of the 2 MB ceiling in AGENTS.md
+section 5, leaving about 0.6 MB. Every surface is built in code or drawn to a
+small canvas texture, so there are no binary assets to blow it.
+
 
 ## The ingredients
 
@@ -186,46 +212,50 @@ ingredient has its own window inside it. Nothing new is stored or triggered;
 the ingredients read the scroll value the page already had.
 
 The scroll-driven part of every ingredient is a closed-form function of that
-progress, so scrolling back up empties the glass again in exactly the reverse
+progress, so scrolling back up empties the cup again in exactly the reverse
 order — the same guarantee the shatter has. The clock-driven parts (the climb,
 the bob, the sway) are separate and never touch scroll.
 
 Everything is fitted against `liquidProfile.js`, which is the drink's measured
 bounds pulled out of `Liquid.jsx`. Ice, mint and bubbles all ask it how much
-room there is at their own height rather than carrying a copied constant, and
-`verify-ingredients.mjs` sweeps both tiers and asserts every instance of every
-ingredient stays inside. The fruit goes further: the verifier builds all four
-slices, walks every vertex, and checks each one against the real glass wall.
+room there is at the height that actually constrains them rather than carrying a
+copied constant, and `verify-ingredients.mjs` sweeps both tiers and asserts every
+instance of every ingredient stays inside. The fruit goes further: the verifier
+builds all four slices, walks every vertex, and checks each one against the real
+cup wall.
 
 | | desktop | mobile |
 |---|---|---|
-| Bubbles | 80, one `InstancedMesh` | 40, one `InstancedMesh` |
-| Ice | 5 rounded cubes, one `InstancedMesh` | same |
-| Mint | 10 leaves, one `InstancedMesh` | 8 |
-| Fruit | one slice, built from primitives | same |
+| Rising bubbles | 80, one `InstancedMesh` | 40, one `InstancedMesh` |
+| Wall bubbles | 60, one `InstancedMesh` | 30 |
+| Ice | 3 rounded cubes, one `InstancedMesh` | same |
+| Mint | 24 leaves, one `InstancedMesh` | 14 |
+| Fruit slices | 3, wedged against the wall | 2 |
+| Whole fruit | 3–4 orbiting the cup | same |
 
 **The drink had to become translucent for any of this to be visible.** It was a
 closed lathe with a hard `1.0` alpha, so anything placed inside it — bubbles
 included — was hidden behind its own front face. It is now `transparent` at
-0.85, with depth writes off and front faces only, so the back wall is culled
-and you look into the drink. Its geometry, uniforms, fill level and color lerp
-are unchanged.
+0.75, with depth writes off and front faces only, so the back wall is culled
+and you look into the drink. Phase 7 mixed the flavour's `liquidColor` 55% of
+the way to white and lightened the top, because a pale drink shows the mint and
+the wall bubbles far better than a saturated one; the shader and the fill level
+are otherwise unchanged.
 
-The ingredients are parented inside the same group as the glass, the one
-`MojitoGroup.jsx` already hides when the glass breaks, so the shatter takes
-them with it and no shatter logic was touched.
+The ingredients are parented inside the group `MojitoGroup.jsx` already hides
+when the cup breaks, so the shatter takes them with it and no shatter logic was
+touched.
 
-The ice material is the glass recipe with a different opacity — same tier
-numbers, same fresnel rim, one set of values. The mint leaf is a shape built
-from two curves, coloured by a vertex gradient rather than a texture, because
-the asset budget has about 0.3 MB left and a leaf image would have spent it.
-The fruit is a small group of primitives per flavor: fruit is the one
-ingredient that needs no instancing, since only one slice is ever on screen.
+The ice material is the plastic recipe with `transmission: 0` and its own
+opacity, so ice never pays for a second scene pass — and never samples the empty
+canvas on desktop. The mint's shape is built in code from a serrated outline and
+a small 128 px `CanvasTexture` draws its veins, which is a texture the asset
+budget does not have to carry. The fruit slices and the whole fruits are small
+groups of primitives per flavor, with colours that come from the `fruit` block on
+their flavor in `config/flavors.js` — no colour is written inside a 3D component.
 
-Every slice's colors come from the `fruit` block on its flavor in
-`config/flavors.js`, so no color is written inside a 3D component. Mint is the
-one ingredient that is not flavor data — every mojito gets the same mint — so
-its two greens are a separate export in the same file rather than four
+Mint is the one ingredient that is not flavor data — every mojito gets the same
+mint — so its greens are a separate export in the same file rather than four
 identical copies on the flavor objects.
 
 ## The backdrop
@@ -238,29 +268,32 @@ opaque gradient hides it instantly, which is what Phase 3A was doing.
 ## The shatter
 
 Approaching the contact section, `breakProgress` runs 0 to 1, scrubbed by
-ScrollTrigger. The glass drops and shakes up to 0.3, then the intact glass and
-liquid hide and 60 shards (40 on mobile) appear in their place, flying outward,
-falling and fading to nothing.
+ScrollTrigger. The cup drops and shakes up to 0.3, then the intact cup and its
+drink hide and 60 shards (40 on mobile) appear in their place, flying outward,
+falling and fading to nothing. The lid breaks with it, and the shards use the
+same plastic recipe as the cup, so they are obviously the same material.
 
-Shard origins are points sampled from the glass's own surface, and shard sizes,
-speeds and gravity are all multiplied by the glass's width, so the burst keeps
-its proportions if the model is replaced. Earlier the origins were placed at
-y −0.39..0.39, which is a *centred* space; the glass's space runs 0 (base) to 1
-(rim), so half the burst started below the glass. The verifier had encoded the
-same wrong assumption and passed. It now asserts the burst spans the glass.
+Shard origins are points sampled from the cup's own surface — wall, floor and
+lid dome — and shard sizes, speeds and gravity are all multiplied by the cup's
+width, so the burst keeps its proportions if the profile is retuned. Earlier the
+origins were placed at y −0.39..0.39, which is a *centred* space; the cup's space
+runs 0 (base) to 1 (rim), so half the burst started below the cup. The verifier
+had encoded the same wrong assumption and passed. It now asserts the burst spans
+the cup.
 
 Nothing integrates velocity over time. Every shard's position, rotation and
 alpha is a closed-form function of `breakProgress`, which is what makes
-scrolling back up reassemble the glass exactly rather than leaving it
-scattered. `scripts/verify-shatter.mjs` asserts that reversal over 200 scroll
-steps, plus alpha monotonicity, finite values, unit-length rotation
-quaternions, shard origins on the real surface, and the shape of the measured
-interior profile.
+scrolling back up reassemble the cup exactly rather than leaving it scattered.
+`scripts/verify-shatter.mjs` asserts that reversal over 200 scroll steps, plus
+alpha monotonicity, finite values, unit-length rotation quaternions, shard
+origins on the real surface, the lid breaking too, and the shape of the interior
+cone.
 
 `scripts/verify-ingredients.mjs` does the same job for the ingredients: the
 same reversal sweep, the appearance order, and a bounds check that walks every
-instance — and every vertex of every fruit slice — against the glass and the
-drink. Both run together:
+instance — and every vertex of every fruit slice and every leaf — against the
+plastic and the drink. The other three suites cover the whole fruit, the splash
+and the Phase 8A fit. They all run together:
 
 ```powershell
 pnpm verify
@@ -274,5 +307,9 @@ pnpm verify
 - [x] 3B. Glass shatter and contact details
 - [x] 3C. Realistic glass, environment map, contact shadow, CSS backdrop
 - [x] 4. Scroll story: ice, mint, fruit, bubbles (committed as "phase-5: ingredients")
-- [ ] 5. Mobile optimization pass
-- [ ] 6. Loader, SEO, deploy to Vercel
+- [x] 5. Whole fruits and the juice splash (committed with "phase-7")
+- [x] 6. Takeaway cup, packed mint, wall bubbles (committed as "phase-7: takeaway cup")
+- [x] 7. Tilt right, and keep the straw on screen (committed as "phase-8a")
+- [ ] 8. Fruit-field background
+- [ ] 9. Mobile optimization pass
+- [ ] 10. Loader, SEO, deploy to Vercel

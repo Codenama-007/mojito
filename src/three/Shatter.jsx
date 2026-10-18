@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { glassModel, shardSpawns } from '../config/glassProfile.js'
+import { cupModel, shardSpawns } from '../config/cupProfile.js'
 import { quality } from '../config/performance.js'
 import { useStore } from '../store/useStore.js'
-import { createGlassMaterial } from './shaders/glassMaterial.js'
+import { createPlasticMaterial } from './shaders/plasticMaterial.js'
 import {
   BREAK_START,
   buildShards,
@@ -46,15 +46,16 @@ export default function Shatter() {
   const meshRef = useRef(null)
   const count = quality.shardCount
 
-  // Origins come from points measured on the glass, so the burst starts on the
-  // surface. Sizes, speeds and gravity scale with the glass's width, so the
-  // burst keeps its proportions if the model is swapped.
+  // Origins come from points computed on the cup, so the burst starts on the
+  // surface and the lid breaks with the body. Sizes, speeds and gravity scale
+  // with the cup's width, so the burst keeps its proportions if the shape is
+  // retuned.
   const shards = useMemo(
-    () => buildShards(count, { spawns: shardSpawns, width: glassModel.widestRadius * 2 }),
+    () => buildShards(count, { spawns: shardSpawns, width: cupModel.widestRadius * 2 }),
     [count],
   )
   const geometry = useMemo(() => buildShardGeometry(count), [count])
-  const material = useMemo(() => createGlassMaterial({ instanceFade: true }), [])
+  const material = useMemo(() => createPlasticMaterial({ instanceFade: true }), [])
 
   // Scratch objects, so the per-frame loop allocates nothing.
   const scratch = useRef({

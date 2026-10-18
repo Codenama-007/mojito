@@ -1,13 +1,13 @@
 import * as THREE from 'three'
 import { flavors } from '../src/config/flavors.js'
-import { glassModel } from '../src/config/glassProfile.js'
+import { cupModel } from '../src/config/cupProfile.js'
 import { quality, TIERS } from '../src/config/performance.js'
 import {
+  cupRadiusAt,
   drinkBoundAt,
   drinkFloorY,
   drinkSurfaceY,
   drinkTopRadius,
-  glassRadiusAt,
 } from '../src/three/liquidProfile.js'
 import {
   BUILD_END,
@@ -16,12 +16,34 @@ import {
   buildBubbles,
   buildIce,
   buildMint,
-  cubeReach,
+  buildWallBubbles,
   iceState,
   mintState,
   revealAt,
+  wallBubbleState,
 } from '../src/three/ingredientMath.js'
+import { buildLeafGeometry } from '../src/three/leafGeometry.js'
 import { buildFruit, disposeFruit } from '../src/three/fruitModels.js'
+
+/**
+ * The ingredients, checked without a renderer.
+ *
+ * Everything here is a pure function of scroll progress and time, which is what
+ * makes this possible at all. The checks fall into three groups:
+ *
+ *  1. Every ingredient stays inside the drink. Not inside the cup — inside the
+ *     *drink*, because a leaf floating in the gap between the liquid and the
+ *     wall is just as wrong as one poking through the plastic.
+ *  2. Scroll is reversible. Sweeping up and back down has to retrace the same
+ *     path exactly, or the build accumulates state and the second pass looks
+ *     different from the first.
+ *  3. The tier counts are the tier counts, so a performance regression is a
+ *     failed test rather than something to notice on a phone.
+ *
+ * Phase 7 rebuilt the glass as a tapered takeaway cup and repacked the mint
+ * against its wall, so the leaf check measures the real leaf geometry rather
+ * than approximating a leaf as a line.
+ */
 
 const failures = []
 const check = (name, ok, detail = '') => {
@@ -42,9 +64,23 @@ const MOTION = 1
  * no `window`, so `quality` is always mobile here and the desktop counts would
  * otherwise never be built, let alone checked.
  */
-const bubbles = [...buildBubbles(TIERS.mobile.bubbleCount), ...buildBubbles(TIERS.desktop.bubbleCount)]
+const bubbles = [
+  ...buildBubbles(TIERS.mobile.bubbleCount),
+  ...buildBubbles(TIERS.desktop.bubbleCount),
+]
+const wallBubbles = [
+  ...buildWallBubbles(TIERS.mobile.wallBubbleCount),
+  ...buildWallBubbles(TIERS.desktop.wallBubbleCount),
+]
 const cubes = buildIce(quality.iceCount)
-const leaves = [...buildMint(TIERS.mobile.mintCount), ...buildMint(TIERS.desktop.mintCount)]
+const leaves = [
+  ...buildMint(TIERS.mobile.mintCount),
+  ...buildMint(TIERS.desktop.mintCount),
+]
+const fruits = flavors.flatMap((flavor) => [
+  buildFruit(flavor.fruit, TIERS.mobile.fruitSliceCount),
+  buildFruit(flavor.fruit, TIERS.desktop.fruitSliceCount),
+])
 
 // ------------------------------------------------------- scroll is reversible
 // Sweep progress up, sweep it back down, compare every ingredient at the same
@@ -65,13 +101,17 @@ const sampleAt = (progress) => {
     const p = bubblePosition(bubble, TIME, MOTION)
     out.push(p.x, p.y, p.z)
   }
+  for (const bubble of wallBubbles) {
+    const s = wallBubbleState(bubble, TIME, MOTION)
+    out.push(s.x, s.y, s.z, s.scale)
+  }
   for (const cube of cubes) {
     const s = iceState(cube, reveal.ice, TIME, MOTION)
     out.push(s.x, s.y, s.z, s.scale, s.spin, s.tilt)
   }
   for (const leaf of leaves) {
     const s = mintState(leaf, reveal.mint, TIME, MOTION)
-    out.push(s.x, s.y, s.z, s.scale, s.heading, s.tilt)
+    out.push(s.x, s.y, s.z, s.scale, s.heading, s.lean, s.roll)
   }
 
   return out
@@ -140,33 +180,42 @@ check(
   ordered,
   WINDOWS.map(([name, window]) => `${name}@${window[0]}`).join(' < '),
 )
-check('fruit is still absent while the ice is dropping', revealAt(BUILD_END * 0.4, REVEAL.fruit) === 0)
+check(
+  'fruit is still absent while the ice is dropping',
+  revealAt(BUILD_END * 0.4, REVEAL.fruit) === 0,
+)
 
-// ------------------------------------------------------------------- bubbles
+// ------------------------------------------------------------------- counts
 check(
-  'the mobile tier asks for 40 bubbles and 8 leaves',
-  TIERS.mobile.bubbleCount === 40 && TIERS.mobile.mintCount === 8,
-  `${TIERS.mobile.bubbleCount} bubbles, ${TIERS.mobile.mintCount} leaves`,
+  'the mobile tier asks for the Phase 7 counts',
+  TIERS.mobile.bubbleCount === 40 &&
+    TIERS.mobile.wallBubbleCount === 30 &&
+    TIERS.mobile.mintCount === 14 &&
+    TIERS.mobile.iceCount === 3 &&
+    TIERS.mobile.fruitSliceCount === 2,
+  `${TIERS.mobile.bubbleCount} rising, ${TIERS.mobile.wallBubbleCount} wall, ${TIERS.mobile.mintCount} leaves, ${TIERS.mobile.iceCount} cubes, ${TIERS.mobile.fruitSliceCount} slices`,
 )
 check(
-  'the desktop tier asks for 80 bubbles and 10 leaves',
-  TIERS.desktop.bubbleCount === 80 && TIERS.desktop.mintCount === 10,
-  `${TIERS.desktop.bubbleCount} bubbles, ${TIERS.desktop.mintCount} leaves`,
-)
-check(
-  'mint stays within the 8 to 10 the brief asks for, on both tiers',
-  Object.values(TIERS).every((tier) => tier.mintCount >= 8 && tier.mintCount <= 10),
-)
-check(
-  'both tiers ask for five ice cubes',
-  TIERS.mobile.iceCount === 5 && TIERS.desktop.iceCount === 5,
+  'the desktop tier asks for the Phase 7 counts',
+  TIERS.desktop.bubbleCount === 80 &&
+    TIERS.desktop.wallBubbleCount === 60 &&
+    TIERS.desktop.mintCount === 24 &&
+    TIERS.desktop.iceCount === 3 &&
+    TIERS.desktop.fruitSliceCount === 3,
+  `${TIERS.desktop.bubbleCount} rising, ${TIERS.desktop.wallBubbleCount} wall, ${TIERS.desktop.mintCount} leaves, ${TIERS.desktop.iceCount} cubes, ${TIERS.desktop.fruitSliceCount} slices`,
 )
 check(
   'this process detects the mobile tier, as expected without a window',
   quality.bubbleCount === TIERS.mobile.bubbleCount,
-  `${bubbles.length} bubbles checked across both tiers`,
+  `${bubbles.length} rising bubbles checked across both tiers`,
+)
+check(
+  'the mint is dense enough to be packed rather than garnished',
+  TIERS.mobile.mintCount >= 12 && TIERS.desktop.mintCount >= 20,
+  `${TIERS.mobile.mintCount}/${TIERS.desktop.mintCount}`,
 )
 
+// ------------------------------------------------------------------- bubbles
 let worstBubble = 0
 let bubbleFinite = true
 let bubbleMinY = Infinity
@@ -190,7 +239,7 @@ for (const bubble of bubbles) {
 }
 check('no NaN in any bubble position', bubbleFinite)
 check(
-  'every bubble stays inside the drink',
+  'every rising bubble stays inside the drink',
   worstBubble <= 1e-9,
   `worst overhang ${worstBubble.toExponential(2)}`,
 )
@@ -211,10 +260,61 @@ const looped = bubbles.every((bubble) => {
   const b = bubblePosition(bubble, 1 / bubble.speed, MOTION)
   return Math.abs(a.y - b.y) < 1e-9
 })
-check('every bubble loops back to where it started', looped)
+check('every rising bubble loops back to where it started', looped)
+
+// -------------------------------------------------------------- wall bubbles
+let worstWall = 0
+let wallFinite = true
+let wallMinY = Infinity
+let wallMaxY = -Infinity
+let wallHug = 0
+for (const bubble of wallBubbles) {
+  // 40s at 0.25s steps covers every bubble's whole grip-and-release cycle twice,
+  // because the slowest cycle is 20s.
+  for (let i = 0; i <= 160; i++) {
+    const t = i * 0.25
+    const s = wallBubbleState(bubble, t, MOTION)
+    if (!Number.isFinite(s.x) || !Number.isFinite(s.y) || !Number.isFinite(s.scale)) {
+      wallFinite = false
+    }
+    // The sphere at its *shimmering* radius, which is the widest it ever gets.
+    worstWall = Math.max(worstWall, Math.hypot(s.x, s.z) + s.scale - drinkBoundAt(s.y))
+    wallMinY = Math.min(wallMinY, s.y - s.scale)
+    wallMaxY = Math.max(wallMaxY, s.y + s.scale)
+  }
+  wallHug = Math.max(wallHug, bubble.radialFrac)
+}
+check('no NaN in any wall bubble', wallFinite)
+check(
+  'every wall bubble stays inside the drink, shimmer included',
+  worstWall <= 1e-9,
+  `worst overhang ${worstWall.toExponential(2)}`,
+)
+check(
+  'wall bubbles stay under the surface and off the floor',
+  wallMinY >= drinkFloorY - 1e-9 && wallMaxY <= drinkSurfaceY + 1e-9,
+  `y ${wallMinY.toFixed(4)} to ${wallMaxY.toFixed(4)}`,
+)
+check(
+  'wall bubbles cling to the wall rather than drifting in the middle',
+  wallHug > 0.99,
+  `closest radialFrac ${wallHug.toFixed(3)}`,
+)
+
+let detached = 0
+for (const bubble of wallBubbles) {
+  const states = []
+  for (let i = 0; i <= 160; i++) states.push(wallBubbleState(bubble, i * 0.25, MOTION))
+  if (Math.max(...states.map((s) => s.scale)) > bubble.size * 1.001) detached++
+}
+check(
+  'every wall bubble shimmers bigger at some point in its cycle',
+  detached === wallBubbles.length,
+  `${detached} of ${wallBubbles.length}`,
+)
 
 // ----------------------------------------------------------------------- ice
-check('ice is five cubes', cubes.length === 5, `${cubes.length}`)
+check('ice is three cubes', cubes.length === 3, `${cubes.length}`)
 
 const corners = []
 for (const sx of [-1, 1]) {
@@ -249,10 +349,7 @@ for (const cube of cubes) {
 
     for (const c of corners) {
       corner.copy(c).multiplyScalar(0.5).applyMatrix4(scratchMatrix)
-      worstIce = Math.max(
-        worstIce,
-        Math.hypot(corner.x, corner.z) - drinkBoundAt(corner.y),
-      )
+      worstIce = Math.max(worstIce, Math.hypot(corner.x, corner.z) - drinkBoundAt(corner.y))
     }
   }
 
@@ -262,16 +359,25 @@ for (const cube of cubes) {
 }
 
 const start = iceState(cubes[0], 0, TIME, MOTION)
+const startTop = start.y + cubes[0].size / 2
 check('no NaN anywhere in the ice', iceFinite)
 check(
-  'every ice cube fits inside the bowl for the whole drop',
+  'every ice cube fits inside the drink for the whole drop',
   worstIce <= 1e-9,
   `worst overhang ${worstIce.toExponential(2)}`,
 )
+// Phase 7 put a lid on the cup, so the drop now starts *inside* it: above the
+// surface, so it reads as falling in, and below the rim, so it does not fall
+// through the plastic.
 check(
-  'ice drops in from above the rim',
-  start.y + cubes[0].size / 2 > glassModel.rimY,
-  `starts at y ${(start.y + cubes[0].size / 2).toFixed(3)} vs rim ${glassModel.rimY}`,
+  'ice appears above the drink surface',
+  startTop > drinkSurfaceY,
+  `starts at y ${startTop.toFixed(3)} vs surface ${drinkSurfaceY.toFixed(3)}`,
+)
+check(
+  'ice appears below the rim, so it never falls through the lid',
+  startTop < cupModel.rimY,
+  `starts at y ${startTop.toFixed(3)} vs rim ${cupModel.rimY}`,
 )
 check(
   'ice lands at the surface, not on the floor',
@@ -290,34 +396,79 @@ check(
   `${leaves.length} leaves checked across both tiers`,
 )
 
+/**
+ * The leaf's real outline, transformed exactly as Mint.jsx transforms it.
+ *
+ * Phase 5 treated a leaf as a line of its own length; Phase 7's leaves are
+ * pressed against the wall, where the *width* of the blade and the serration on
+ * it are what decides whether one pokes through the plastic. So the check walks
+ * the actual geometry.
+ */
+const leafVertices = buildLeafGeometry().attributes.position
+
+const leafMatrix = new THREE.Matrix4()
+const leafQuaternion = new THREE.Quaternion()
+const leafEuler = new THREE.Euler(0, 0, 0, 'YXZ')
+const leafPosition = new THREE.Vector3()
+const leafScaleVector = new THREE.Vector3()
+const leafPoint = new THREE.Vector3()
+
 let worstMint = 0
 let mintFinite = true
 let mintMinY = Infinity
 let mintMaxY = -Infinity
+let mintWallHug = Infinity
 const mintScale = []
+
 for (const leaf of leaves) {
-  for (let i = 0; i <= 200; i++) {
-    const s = mintState(leaf, i / 200, TIME, MOTION)
+  for (let i = 0; i <= 24; i++) {
+    const s = mintState(leaf, i / 24, TIME, MOTION)
     if (!Number.isFinite(s.x) || !Number.isFinite(s.scale)) mintFinite = false
 
-    // Half its length along the leaf, plus half its narrow width across it.
-    const reach = (leaf.length * s.scale) / 2
-    worstMint = Math.max(worstMint, Math.hypot(s.x, s.z) + reach - drinkBoundAt(s.y))
-    mintMinY = Math.min(mintMinY, s.y - reach)
-    mintMaxY = Math.max(mintMaxY, s.y + reach)
+    leafEuler.set(s.lean, s.heading, s.roll)
+    leafQuaternion.setFromEuler(leafEuler)
+    leafPosition.set(s.x, s.y, s.z)
+    leafScaleVector.setScalar(leaf.length * s.scale)
+    leafMatrix.compose(leafPosition, leafQuaternion, leafScaleVector)
+
+    for (let v = 0; v < leafVertices.count; v++) {
+      leafPoint.fromBufferAttribute(leafVertices, v).applyMatrix4(leafMatrix)
+      // A leaf is a sheet, so its vertices *are* its surface — no half-size
+      // correction, the way the cube and the sphere need one.
+      worstMint = Math.max(
+        worstMint,
+        Math.hypot(leafPoint.x, leafPoint.z) - drinkBoundAt(leafPoint.y),
+      )
+      mintMinY = Math.min(mintMinY, leafPoint.y)
+      mintMaxY = Math.max(mintMaxY, leafPoint.y)
+    }
   }
   mintScale.push(mintState(leaf, 1, TIME, MOTION).scale)
+  mintWallHug = Math.min(mintWallHug, leaf.radius / drinkBoundAt(leaf.y))
 }
+
+const drinkMidY = (drinkSurfaceY + drinkFloorY) / 2
+
 check('no NaN anywhere in the mint', mintFinite)
 check(
-  'every leaf fits inside the bowl mouth',
+  'every leaf fits inside the drink, serrated margin and all',
   worstMint <= 1e-9,
   `worst overhang ${worstMint.toExponential(2)}`,
 )
 check(
-  'mint floats on the surface, not at the bottom',
-  mintMinY > drinkSurfaceY - 0.05,
-  `y ${mintMinY.toFixed(3)} to ${mintMaxY.toFixed(3)}`,
+  'mint is packed into the upper half of the drink, not floated on top',
+  mintMinY > drinkMidY,
+  `y ${mintMinY.toFixed(3)} to ${mintMaxY.toFixed(3)}, halfway ${drinkMidY.toFixed(3)}`,
+)
+check(
+  'mint stays clear of the rim, so nothing pokes out of the open cup',
+  mintMaxY < cupModel.rimY,
+  `tallest point ${mintMaxY.toFixed(3)} vs rim ${cupModel.rimY}`,
+)
+check(
+  'every leaf is pressed out towards the wall, not stacked on the axis',
+  mintWallHug > 0.6,
+  `closest leaf at ${(mintWallHug * 100).toFixed(0)}% of its room`,
 )
 check(
   'every leaf is fully grown by the end',
@@ -338,9 +489,9 @@ let fruitMinY = Infinity
 let fruitMaxY = -Infinity
 let fruitTriangles = 0
 let fruitSlack = 0
+let fruitSliceCount = 0
 
-for (const flavor of flavors) {
-  const fruit = buildFruit(flavor.fruit)
+for (const fruit of fruits) {
   fruit.updateMatrixWorld(true)
 
   fruit.traverse((child) => {
@@ -352,86 +503,78 @@ for (const flavor of flavors) {
 
     for (let i = 0; i < position.count; i++) {
       corner.fromBufferAttribute(position, i).applyMatrix4(child.matrixWorld)
-      worstFruit = Math.max(
-        worstFruit,
-        Math.hypot(corner.x, corner.z) - glassRadiusAt(corner.y),
-      )
+      worstFruit = Math.max(worstFruit, Math.hypot(corner.x, corner.z) - cupRadiusAt(corner.y))
       fruitSlack = Math.max(
         fruitSlack,
         Math.hypot(corner.x, corner.z) - drinkBoundAt(corner.y),
       )
       fruitMinY = Math.min(fruitMinY, corner.y)
       fruitMaxY = Math.max(fruitMaxY, corner.y)
+      if (corner.y >= cupModel.rimY) fruitBelowRim = false
+      if (corner.y <= drinkFloorY) fruitAboveFloor = false
     }
   })
 
-  const hasGeometry = fruit.children.length > 0
-  if (!hasGeometry) fruitBelowRim = false
-  disposeFruit(fruit)
-}
-
-// Recomputed with per-flavor ranges because the loop above shares one box; the
-// two assertions below are about every vertex of every flavor.
-for (const flavor of flavors) {
-  const fruit = buildFruit(flavor.fruit)
-  fruit.updateMatrixWorld(true)
-  fruit.traverse((child) => {
-    if (!child.isMesh) return
-    const position = child.geometry.attributes.position
-    for (let i = 0; i < position.count; i++) {
-      corner.fromBufferAttribute(position, i).applyMatrix4(child.matrixWorld)
-      if (corner.y > glassModel.rimY) fruitBelowRim = false
-      if (corner.y < drinkFloorY) fruitAboveFloor = false
-    }
-  })
+  fruitSliceCount += fruit.children.length
   disposeFruit(fruit)
 }
 
 check(
-  'every fruit vertex is inside the glass it sits in',
+  'every fruit vertex is inside the cup it sits in',
   worstFruit <= 1e-9,
   `worst overhang ${worstFruit.toExponential(2)}`,
 )
 check(
-  'every fruit vertex stays under the rim',
+  'no fruit vertex reaches the rim',
   fruitBelowRim,
-  `tallest point y ${fruitMaxY.toFixed(3)} vs rim ${glassModel.rimY}`,
+  `tallest point y ${fruitMaxY.toFixed(3)} vs rim ${cupModel.rimY}`,
 )
 check(
-  'every fruit vertex is inside the bowl',
+  'no fruit vertex reaches the floor',
   fruitAboveFloor,
-  `lowest point y ${fruitMinY.toFixed(3)} vs bowl floor ${drinkFloorY.toFixed(3)}`,
+  `lowest point y ${fruitMinY.toFixed(3)} vs floor ${drinkFloorY.toFixed(3)}`,
 )
 check(
-  'fruit sits at the top of the drink, not at the bottom',
-  fruitMinY > (drinkSurfaceY + drinkFloorY) / 2,
-  `y ${fruitMinY.toFixed(3)} to ${fruitMaxY.toFixed(3)}, surface ${drinkSurfaceY.toFixed(3)}`,
+  'the slices are wedged in the upper half of the drink',
+  fruitMinY > drinkMidY,
+  `y ${fruitMinY.toFixed(3)} to ${fruitMaxY.toFixed(3)}, halfway ${drinkMidY.toFixed(3)}`,
 )
 check(
-  'the fruit reaches the drink surface',
-  fruitMinY <= drinkSurfaceY + 0.01,
-  `lowest point y ${fruitMinY.toFixed(3)}`,
+  'the slices reach down to the drink surface, not just the top',
+  fruitMinY <= drinkSurfaceY + 0.02,
+  `lowest point y ${fruitMinY.toFixed(3)}, surface ${drinkSurfaceY.toFixed(3)}`,
+)
+check(
+  'both tiers build the slice count they ask for',
+  fruitSliceCount ===
+    flavors.length * (TIERS.mobile.fruitSliceCount + TIERS.desktop.fruitSliceCount),
+  `${fruitSliceCount} slices across four flavors and both tiers`,
 )
 console.log(
-  `  ....  fruit stay inside the drink with ${fruitSlack.toExponential(2)} of slack, ${Math.round(fruitTriangles)} triangles across all four flavors`,
+  `  ....  slices overhang the drink by ${fruitSlack.toExponential(2)} at their tightest (they sit against the cup, and the drink stops short of it), ${Math.round(fruitTriangles)} triangles across all four flavors`,
 )
 
 // -------------------------------------------------------------- shared bounds
 check(
   'the drink is narrower than the rim it has to pass',
-  drinkTopRadius < glassModel.widestRadius,
-  `surface radius ${drinkTopRadius.toFixed(5)} < widest ${glassModel.widestRadius.toFixed(5)}`,
+  drinkTopRadius < cupModel.widestRadius,
+  `surface radius ${drinkTopRadius.toFixed(5)} < widest ${cupModel.widestRadius.toFixed(5)}`,
 )
 check(
   'every ingredient is bounded by the drink, not by a guess',
   drinkBoundAt(drinkSurfaceY + 0.02) === drinkTopRadius,
+)
+check(
+  'the drink never widens past the cup interior',
+  drinkTopRadius <= cupRadiusAt(cupModel.rimY) + 1e-9,
+  `${drinkTopRadius.toFixed(5)} vs interior ${cupRadiusAt(cupModel.rimY).toFixed(5)}`,
 )
 
 // --------------------------------------------------------------------- summary
 console.log('')
 console.log(
   failures.length === 0
-    ? `PASS: all checks green (${bubbles.length} bubbles and ${leaves.length} leaves across both tiers, ${cubes.length} cubes, ${flavors.length} fruits)`
+    ? `PASS: all checks green (${bubbles.length} rising and ${wallBubbles.length} wall bubbles, ${leaves.length} leaves, ${cubes.length} cubes, ${fruitSliceCount} slices across both tiers)`
     : `FAIL: ${failures.join(' | ')}`,
 )
 process.exit(failures.length === 0 ? 0 : 1)

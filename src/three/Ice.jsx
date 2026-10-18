@@ -4,22 +4,28 @@ import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { prefersReducedMotion, quality } from '../config/performance.js'
 import { useStore } from '../store/useStore.js'
-import { createGlassMaterial } from './shaders/glassMaterial.js'
+import { createPlasticMaterial } from './shaders/plasticMaterial.js'
 import { REVEAL, buildIce, iceState, revealAt } from './ingredientMath.js'
 
 /**
- * Five rounded cubes in one InstancedMesh, floating half-submerged near the
- * surface, each dropping in from above its own resting place.
+ * Three small rounded cubes in one InstancedMesh, floating half-submerged near
+ * the surface, each dropping in from above its own resting place.
  *
- * The material is the glass recipe, so the ice picks up the same tier rules,
+ * Down from five on both tiers in Phase 7: the upper half of the cup is now
+ * packed with mint, and the ice is meant to be glimpsed *through* it rather
+ * than to be the thing you notice.
+ *
+ * The material is the plastic recipe, so the ice picks up the same tier rules,
  * clearcoat and fresnel rim with no second set of numbers to keep in sync
- * (AGENTS.md section 4).
+ * (AGENTS.md section 4) — but with transmission forced off, because ice does
+ * not need a second pass over the scene and on desktop the passthrough would
+ * sample the empty canvas behind the cup and go black.
  *
  * The drop is a closed-form function of scroll progress, so scrolling up lifts
- * the cubes back out of the glass instead of leaving them in the drink.
+ * the cubes back out of the cup instead of leaving them in the drink.
  */
 
-/** Above the drink (0) and the bubbles (0.2), below the glass (2). */
+/** Above the drink (0), the bubbles (0.2/0.3) and the mint (0.4), below the cup (2). */
 const RENDER_ORDER = 0.6
 
 /** Unit cube; each instance is scaled to its own size. */
@@ -36,7 +42,7 @@ export default function Ice({ count = quality.iceCount }) {
   )
 
   const material = useMemo(
-    () => createGlassMaterial({ opacity: quality.iceOpacity }),
+    () => createPlasticMaterial({ opacity: quality.iceOpacity, transmission: 0 }),
     [],
   )
 

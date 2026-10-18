@@ -1,5 +1,6 @@
 import * as THREE from 'three'
-import { glassModel, interiorProfile, shardSpawns } from '../src/config/glassProfile.js'
+import { cupModel, lidModel, shardSpawns } from '../src/config/cupProfile.js'
+import { cupOuterRadiusAt, cupRadiusAt } from '../src/three/liquidProfile.js'
 import {
   BREAK_START,
   buildShards,
@@ -9,6 +10,16 @@ import {
   shardRotation,
   shardTi,
 } from '../src/three/shardMath.js'
+
+/**
+ * The shatter, checked without a renderer.
+ *
+ * Phase 4 measured the spawn points off public/models/glass.glb. Phase 7 builds
+ * the cup in code, so there is nothing to measure: config/cupProfile.js computes
+ * the points and this file checks the computation — that they sit on the real
+ * surface, that they cover the lid as well as the body, and that the interior
+ * profile the drink is built from cannot escape the outer one.
+ */
 
 const failures = []
 const check = (name, ok, detail = '') => {
@@ -20,7 +31,12 @@ const check = (name, ok, detail = '') => {
   }
 }
 
-const WIDTH = glassModel.widestRadius * 2
+/** Matches Shatter.jsx: the number shard sizes and speeds are scaled by. */
+const WIDTH = cupModel.widestRadius * 2
+
+/** The lid clips *over* the rim, so it is legitimately a little wider. */
+const WIDEST_RADIUS = Math.max(cupModel.widestRadius, lidModel.radius)
+
 const shards = buildShards(60, { spawns: shardSpawns, width: WIDTH })
 const out = new THREE.Vector3()
 const quat = new THREE.Quaternion()
@@ -94,10 +110,11 @@ check('t is 0 just before the break', tBeforeBreak === 0, `t=${tBeforeBreak}`)
 check('t is 1 at the end', progressToT(1) === 1)
 
 // ------------------------------------------------------------- spawn locations
-// The glass is not centred on its origin: its local space runs y 0 (base) to
-// 1 (rim). The shards are siblings of the glass, so they share that space. An
-// earlier version spawned them at y -0.39..0.39, and the assertion here agreed
-// with it, so the burst came out of the floor and nothing caught it.
+// The cup is not centred on its origin: its local space runs y 0 (base) to 1
+// (rim), and the lid's dome runs on up to lidModel.topY. The shards are
+// siblings of the cup, so they share that space. An earlier version spawned
+// them at y -0.39..0.39, and the assertion here agreed with it, so the burst
+// came out of the floor and nothing caught it.
 let worstRadial = 0
 let minY = Infinity
 let maxY = -Infinity
@@ -109,27 +126,33 @@ for (const shard of shards) {
 }
 
 check(
-  'shard origins sit on or inside the glass surface',
-  worstRadial <= glassModel.widestRadius + 1e-6,
-  `max radial ${worstRadial.toFixed(5)} vs widest ${glassModel.widestRadius.toFixed(5)}`,
+  'shard origins sit on or inside the cup surface',
+  worstRadial <= WIDEST_RADIUS + 1e-6,
+  `max radial ${worstRadial.toFixed(5)} vs widest ${WIDEST_RADIUS.toFixed(5)}`,
 )
 check(
-  'shard origins stay within the glass height',
-  minY >= 0 && maxY <= 1,
-  `y range ${minY.toFixed(3)} to ${maxY.toFixed(3)}`,
+  'shard origins stay within the cup and its lid',
+  minY >= 0 && maxY <= lidModel.topY + 1e-6,
+  `y range ${minY.toFixed(3)} to ${maxY.toFixed(3)} of ${lidModel.topY.toFixed(3)}`,
 )
 check(
-  'the burst spans the whole glass, not one end of it',
+  'the burst spans the whole cup, not one end of it',
   maxY - minY > 0.5,
-  `y spread ${(maxY - minY).toFixed(3)} of 1.0`,
+  `y spread ${(maxY - minY).toFixed(3)} of ${lidModel.topY.toFixed(3)}`,
 )
 check(
-  'every shard starts on the mesh, not in empty space',
-  worstRadial > glassModel.widestRadius * 0.3,
+  'every shard starts on the surface, not in empty space',
+  worstRadial > WIDEST_RADIUS * 0.3,
   `furthest origin ${worstRadial.toFixed(5)} from the axis`,
 )
+// Phase 7 put the lid in the burst, so the spawns have to reach above the rim.
+check(
+  'the lid breaks too, and its shards start on the dome',
+  maxY > cupModel.rimY + 0.05,
+  `highest origin ${maxY.toFixed(3)} vs rim ${cupModel.rimY.toFixed(3)}`,
+)
 
-// Origins must be points that were actually measured on the glass.
+// Origins must be points on the computed surface, not arbitrary offsets.
 const spawnSet = new Set(shardSpawns.map((p) => p.map((v) => v.toFixed(6)).join(',')))
 let unmatched = 0
 for (const shard of shards) {
@@ -139,35 +162,55 @@ for (const shard of shards) {
   if (!spawnSet.has(key)) unmatched++
 }
 check(
-  'every shard origin is a measured surface point',
+  'every shard origin is a computed surface point',
   unmatched === 0,
-  `${shardSpawns.length} measured points, ${unmatched} unmatched`,
+  `${shardSpawns.length} computed points, ${unmatched} unmatched`,
 )
 
 // ------------------------------------------------------------------- profile
-let monotoneUp = true
-let monotoneDown = true
-let widestAt = 0
-for (let i = 1; i < interiorProfile.length; i++) {
-  const [radius, y] = interiorProfile[i]
-  const [previousRadius, previousY] = interiorProfile[i - 1]
-  if (y <= previousY) monotoneUp = false
-  if (radius > interiorProfile[widestAt][0]) widestAt = i
+// The interior is a two-point cone, so the checks are the ones a cone can fail:
+// it must rise without reversing, its mouth must be its widest part, and it
+// must stay behind the outer silhouette at every height — including through the
+// fillet, which is the one place the gap is not a constant.
+const INTERIOR_BASE = cupModel.floorThickness
+let interiorRises = true
+let previousRadius = cupRadiusAt(INTERIOR_BASE + 1e-6)
+
+for (let y = INTERIOR_BASE + 0.01; y <= cupModel.rimY; y += 0.01) {
+  const radius = cupRadiusAt(y)
+  if (radius < previousRadius - 1e-9) interiorRises = false
+  previousRadius = radius
 }
-for (let i = widestAt + 1; i < interiorProfile.length; i++) {
-  if (interiorProfile[i][0] >= interiorProfile[i - 1][0]) monotoneDown = false
+
+check('the interior rises to the mouth with no step or reversal', interiorRises)
+
+const mouthRadius = cupRadiusAt(cupModel.rimY)
+let widestUntilMouth = true
+for (let y = INTERIOR_BASE + 0.01; y < cupModel.rimY; y += 0.01) {
+  if (cupRadiusAt(y) > mouthRadius + 1e-9) widestUntilMouth = false
 }
-const interiorMax = Math.max(...interiorProfile.map((p) => p[0]))
-check('interior profile rises then falls, with no stray ring', monotoneUp && monotoneDown)
 check(
-  'interior stays inside the outer silhouette',
-  interiorMax < glassModel.widestRadius,
-  `interior ${interiorMax.toFixed(5)} < outer ${glassModel.widestRadius.toFixed(5)}`,
+  'the mouth is the widest part of the cup interior',
+  widestUntilMouth,
+  `mouth ${mouthRadius.toFixed(5)}`,
+)
+
+let thinnestWall = Infinity
+let thickestWall = 0
+for (let y = INTERIOR_BASE + 0.01; y <= cupModel.rimY; y += 0.01) {
+  const wall = cupOuterRadiusAt(y) - cupRadiusAt(y)
+  thinnestWall = Math.min(thinnestWall, wall)
+  thickestWall = Math.max(thickestWall, wall)
+}
+check(
+  'the drink stays inside the plastic at every height',
+  thinnestWall > 0,
+  `thinnest wall ${thinnestWall.toFixed(5)}`,
 )
 check(
-  'the bowl is narrower at the rim than at its middle',
-  interiorProfile[interiorProfile.length - 1][0] < interiorMax,
-  `rim ${interiorProfile[interiorProfile.length - 1][0].toFixed(5)} vs middle ${interiorMax.toFixed(5)}`,
+  'the wall never doubles back on itself',
+  thickestWall < cupModel.wallThickness * 2,
+  `thickest ${thickestWall.toFixed(5)} vs ${cupModel.wallThickness}`,
 )
 
 // ------------------------------------------------------------------- staggering
@@ -203,15 +246,15 @@ for (const shard of shards) {
 }
 check('no NaN anywhere in the burst', finite)
 check(
-  'travel stays within a sane multiple of glass height',
+  'travel stays within a sane multiple of cup height',
   maxTravel < 6,
   `max distance ${maxTravel.toFixed(2)} of 1.0`,
 )
 // The shard triangle spans about 1 unit across, so its scale is its width.
 check(
-  'no shard is larger than the glass it came from',
+  'no shard is larger than the cup it came from',
   maxShardSize < WIDTH,
-  `largest shard ${maxShardSize.toFixed(3)} vs glass width ${WIDTH.toFixed(3)}`,
+  `largest shard ${maxShardSize.toFixed(3)} vs cup width ${WIDTH.toFixed(3)}`,
 )
 
 // Quaternions must stay unit length, or instances render scaled/sheared.

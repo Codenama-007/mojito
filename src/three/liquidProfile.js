@@ -1,28 +1,33 @@
-import { interiorProfile } from '../config/glassProfile.js'
+import { cupModel, interiorProfile, outerProfile } from '../config/cupProfile.js'
 
 /**
  * The shape of the drink, in one place, as plain numbers.
  *
  * Phase 4 built the liquid inside Liquid.jsx and kept these numbers to itself.
  * Phase 5 needs the same bounds for the ice, mint and bubbles, and two copies
- * of a measured profile is exactly how the glass and the liquid drift apart.
- * So the geometry moved here: Liquid.jsx turns it into a lathe, the
- * ingredients query it, and scripts/verify-ingredients.mjs checks against it.
+ * of a profile is exactly how the cup and the drink drift apart. So the
+ * geometry moved here: Liquid.jsx turns it into a lathe, the ingredients query
+ * it, and the verifiers check against it.
  *
- * All coordinates are the glass's own local space: y 0 at the base, 1 at the
- * rim, centred on the axis.
+ * All coordinates are the cup's own local space: y 0 at the base, 1 at the rim,
+ * centred on the axis.
  */
 
-/** How full the bowl is, as a fraction of its interior height. */
-export const FILL = 0.8
+/** How full the cup is, as a fraction of its interior height. The brief's 85%. */
+export const FILL = 0.85
 
 /**
- * The liquid is built at this fraction of the bowl's interior radius. The
- * glass wall is about 0.01 thick at the rim, so a little clearance reads as
- * wall thickness; with none, the surface z-fights the glass where the two
- * nearly touch.
+ * The liquid is built at this fraction of the cup's interior radius.
+ *
+ * Phase 4 had this at 0.92, which left a visible moat: the modelled bowl was
+ * narrow and its measured profile wobbled, so the drink had to be pulled in to
+ * stay off the wall. The cup's interior is a clean cone, so the only thing left
+ * to clear is its own thickness — and at 0.965 of a 0.27 radius the drink sits
+ * about 0.0095 from the plastic, which reads as touching it. Pull it further in
+ * and the mint, which is placed against the drink rather than against the cup,
+ * detaches from the wall with it.
  */
-export const CLEARANCE = 0.92
+export const CLEARANCE = 0.965
 
 const wallFloorY = interiorProfile[0][1]
 const wallRimY = interiorProfile[interiorProfile.length - 1][1]
@@ -36,13 +41,12 @@ let cachedFill = null
 let cachedWall = null
 
 /**
- * The bowl's interior, inset and cut off at the fill line.
+ * The cup's interior, inset and cut off at the fill line.
  *
- * The profile is measured, not guessed: the bowl is widest just below its
- * middle (0.20127) and narrower at the rim (0.14518), which is exactly why a
- * cylinder cannot sit inside it. FILL is applied by truncating the profile
- * rather than by scaling the mesh, so the wall stays on the glass at every
- * height.
+ * The profile is a straight cone, so this is too — but the truncation still
+ * matters: FILL is applied by cutting the profile at the fill line rather than
+ * by scaling the mesh, so the wall stays on the cup at every height. Scaling
+ * would move a tapered wall sideways and poke it through the cup.
  *
  * @returns {number[][]} [radius, y] pairs, floor to fill line.
  */
@@ -110,8 +114,8 @@ export function drinkRadiusAt(y, fill = FILL) {
  */
 export const drinkTopRadius = drinkWall(FILL)[drinkWall(FILL).length - 1][0]
 
-/** Interior wall of the bare glass at height y, ignoring the drink. */
-export function glassRadiusAt(y) {
+/** Interior wall of the bare cup at height y, ignoring the drink. */
+export function cupRadiusAt(y) {
   if (y <= interiorProfile[0][1]) return 0
   if (y >= wallRimY) return interiorProfile[interiorProfile.length - 1][0]
 
@@ -128,16 +132,40 @@ export function glassRadiusAt(y) {
 }
 
 /**
- * The radius actually available at height y: never wider than the glass, and
+ * The radius actually available at height y: never wider than the cup, and
  * never wider than the drink, except above the surface where the drink has
- * ended and the glass is all that is left.
+ * ended and the cup is all that is left.
  *
  * Every ingredient is fitted against this rather than against a number copied
- * into a component, so nothing can end up outside the bowl.
+ * into a component, so nothing can end up outside the cup.
  */
 export function drinkBoundAt(y) {
   return Math.min(
-    glassRadiusAt(y),
+    cupRadiusAt(y),
     y >= drinkSurfaceY ? drinkTopRadius : drinkRadiusAt(y),
   )
+}
+
+/**
+ * The outside of the cup at height y — the silhouette, foot and all.
+ *
+ * This is the number the things that float *around* the cup have to clear, as
+ * opposed to `cupRadiusAt`, which is the inside.
+ */
+export function cupOuterRadiusAt(y) {
+  if (y <= outerProfile[0][1]) return outerProfile[0][0]
+  if (y >= outerProfile[outerProfile.length - 1][1]) {
+    return outerProfile[outerProfile.length - 1][0]
+  }
+
+  for (let i = 1; i < outerProfile.length; i++) {
+    const [radius, yi] = outerProfile[i]
+    if (y <= yi) {
+      const [previousRadius, previousY] = outerProfile[i - 1]
+      const t = (y - previousY) / (yi - previousY)
+      return previousRadius + (radius - previousRadius) * t
+    }
+  }
+
+  return cupModel.rimRadius
 }

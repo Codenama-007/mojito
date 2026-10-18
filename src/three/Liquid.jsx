@@ -11,19 +11,27 @@ import { liquidFragment, liquidVertex } from './shaders/liquid.js'
 const COLOR_LERP_TAU = 0.2
 
 /**
- * The drink is translucent, not opaque.
+ * The drink is pale and translucent: 55% of the way to white, at 0.75 alpha.
  *
- * Phase 4 ended the fragment shader with a hard 1.0 alpha, which was fine when
- * the drink was the last thing in the bowl. Phase 5 puts bubbles and ice
- * inside it, and an opaque solid hides anything behind its own front face. So:
- * transparent, 0.85 alpha, no depth writes, front faces only. The last part
- * matters — single-sided means the bowl's back wall is culled and you look
- * into the drink instead of at a solid block that reads as a wall.
+ * Phase 7 keeps the flavour colours in config/flavors.js, where they are the
+ * accent colour, the splash colour and the straw colour, and lets the *drink*
+ * be the washed-out version of them. Through clear plastic, a drink at full
+ * saturation looks like cordial; this is what a mojito in a takeaway cup
+ * actually looks like.
  *
- * Nothing else moved: same lathe, same profile, same uniforms, same color
- * lerp, same fill level.
+ * Not opaque, for the reason Phase 5 introduced: bubbles, ice and mint sit
+ * inside it, and an opaque solid hides anything behind its own front face.
+ * Single-sided, so the far wall is culled and you look *into* the drink rather
+ * than at a solid block that reads as a wall.
  */
-const LIQUID_OPACITY = 0.85
+const LIQUID_OPACITY = 0.75
+
+/** How far the drink is washed towards white. */
+const PALE_MIX = 0.55
+
+const WHITE = new THREE.Color('#ffffff')
+
+const pale = (hex) => new THREE.Color(hex).lerp(WHITE, PALE_MIX)
 
 export default function Liquid({ segments = quality.latheSegments }) {
   const meshRef = useRef(null)
@@ -31,9 +39,7 @@ export default function Liquid({ segments = quality.latheSegments }) {
   const targetColor = useRef(null)
 
   if (targetColor.current === null) {
-    targetColor.current = new THREE.Color(
-      getFlavor(useStore.getState().activeFlavor).liquidColor,
-    )
+    targetColor.current = pale(getFlavor(useStore.getState().activeFlavor).liquidColor)
   }
 
   const { geometry, floorY, topY } = useMemo(() => {
@@ -53,9 +59,7 @@ export default function Liquid({ segments = quality.latheSegments }) {
       new THREE.ShaderMaterial({
         uniforms: {
           uColor: {
-            value: new THREE.Color(
-              getFlavor(useStore.getState().activeFlavor).liquidColor,
-            ),
+            value: pale(getFlavor(useStore.getState().activeFlavor).liquidColor),
           },
           uTime: { value: 0 },
           uAlpha: { value: LIQUID_OPACITY },
@@ -72,7 +76,7 @@ export default function Liquid({ segments = quality.latheSegments }) {
   )
 
   useEffect(() => {
-    targetColor.current.set(getFlavor(activeFlavor).liquidColor)
+    targetColor.current.copy(pale(getFlavor(activeFlavor).liquidColor))
   }, [activeFlavor])
 
   useEffect(
@@ -89,13 +93,15 @@ export default function Liquid({ segments = quality.latheSegments }) {
 
     uniforms.uTime.value = state.clock.elapsedTime
 
-    // Frame-rate independent approach to the active flavor's color.
+    // Frame-rate independent approach to the active flavor's colour. Both ends
+    // are already washed towards white, so the blend never passes through a
+    // saturated colour on its way.
     const step = 1 - Math.exp(-delta / COLOR_LERP_TAU)
     uniforms.uColor.value.lerp(targetColor.current, step)
   })
 
   // The profile already carries real heights, so the mesh sits at the origin.
-  // renderOrder 0 puts the drink under the bubbles, ice and mint that live in
-  // it; the glass sits at 2 and the shards at 3, so neither changed.
+  // renderOrder 0 puts the drink under the bubbles, mint and ice that live in
+  // it; the cup sits at 2 and the shards at 3, so neither changed.
   return <mesh ref={meshRef} geometry={geometry} material={material} renderOrder={0} />
 }
