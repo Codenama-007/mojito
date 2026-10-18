@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { Environment } from '@react-three/drei'
 import { quality } from '../config/performance.js'
 import { useAdaptiveQuality } from '../hooks/useAdaptiveQuality.js'
+import { useStore } from '../store/useStore.js'
 import Ground from './Ground.jsx'
 import MojitoGroup from './MojitoGroup.jsx'
 import FruitField from './FruitField.jsx'
@@ -10,6 +11,26 @@ import { useGlassBaseScale } from '../hooks/useGlassBaseScale.js'
 
 /** Env map shipped in public/, so no CDN request and no runtime build step. */
 const ENV_MAP = '/env/studio.hdr'
+
+/**
+ * Renders nothing, and exists entirely for where it renders: *inside* the
+ * Suspense boundary below, so React only mounts it once the environment map has
+ * arrived. That is the moment the cup is lit the way it was designed to be, which
+ * is what the loader in index.html is waiting for.
+ *
+ * Move it out of that boundary and it fires immediately, and the loader lifts on
+ * an unlit cup.
+ */
+function ReadySignal({ onReady }) {
+  useEffect(() => {
+    onReady()
+  }, [onReady])
+
+  return null
+}
+
+/** Stable, so ReadySignal's effect runs on mount rather than on every render. */
+const markReady = () => useStore.getState().setBooting(false)
 
 /**
  * Inside the canvas, so it can read the viewport. Only the glass and its
@@ -63,6 +84,7 @@ export default function Scene() {
         {/* Its own boundary: a 1.4 MB HDR must not hold up the glass. */}
         <Suspense fallback={null}>
           <Environment files={ENV_MAP} environmentIntensity={quality.environmentIntensity} />
+          <ReadySignal onReady={markReady} />
         </Suspense>
 
         <Stage />

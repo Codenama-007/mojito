@@ -26,6 +26,14 @@ export const useStore = create((set) => ({
   qualityTier,
   flavorDirection: 1,
 
+  /**
+   * True until the scene can be shown. Two things write it — the environment map
+   * resolving in `three/Scene.jsx`, and the give-up timer in `ui/Loader.jsx` for
+   * when it never does — and two things act on it: the loader in `index.html`
+   * comes down, and `useLenis` hands the page back to the visitor.
+   */
+  booting: true,
+
   /** @param {string} id Flavor id from config/flavors.js */
   setActiveFlavor: (id) =>
     set((state) =>
@@ -62,4 +70,7 @@ export const useStore = create((set) => ({
 
   /** @param {number} value Shatter progress, 0 to 1 */
   setBreakProgress: (value) => set({ breakProgress: value }),
+
+  /** @param {boolean} value False once the scene is worth looking at */
+  setBooting: (value) => set({ booting: value }),
 }))

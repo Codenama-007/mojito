@@ -12,9 +12,100 @@
     -->
     <meta name="description" content="A mojito worth scrolling for. Lime, strawberry, apple, mango." />
     <title>Mojito</title>
+
+    <!--
+      The loader, styled here rather than in the app's stylesheet because it has to
+      be styled before that stylesheet exists. A build links the app's CSS in the
+      head, so it would work there — but dev injects it from the module graph, and a
+      loader that looks different in dev is a loader nobody trusts.
+
+      It carries no text on purpose. Everything in the response body is content as
+      far as a crawler is concerned, which is the whole of Phase 9B, and "Loading"
+      is not something this brand has to say. `src/ui/Loader.jsx` takes it away.
+    -->
+    <style>
+      .loader {
+        position: fixed;
+        inset: 0;
+        /* Over the canvas (1), the page (2) and the bar (3). */
+        z-index: 9;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 26px;
+        /* The page's own fallback background, so the handoff is a fade between two
+           identical colours rather than a change of colour. */
+        background: var(--fallback-bg, #d2f261);
+        transition: opacity 480ms ease, visibility 480ms;
+      }
+
+      .loader.is-done {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .loader__mark {
+        width: 56px;
+        height: 56px;
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(22, 33, 15, 0.2);
+      }
+
+      .loader__bar {
+        display: block;
+        width: min(168px, 42vw);
+        height: 3px;
+        border-radius: 999px;
+        background: rgba(22, 33, 15, 0.16);
+        overflow: hidden;
+      }
+
+      .loader__bar span {
+        display: block;
+        width: 42%;
+        height: 100%;
+        border-radius: inherit;
+        background: #16210f;
+        animation: loader-sweep 1100ms cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+      }
+
+      @keyframes loader-sweep {
+        from {
+          transform: translateX(-110%);
+        }
+        to {
+          transform: translateX(340%);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .loader {
+          transition: none;
+        }
+
+        /* Nothing is moving, so nothing should look like it is making progress. */
+        .loader__bar {
+          display: none;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+
+    <!--
+      After #root, so the content a crawler is here for comes first, and outside it
+      so `plugins/ai-prerender.js` can still find its empty `<div id="root"></div>`
+      to rewrite. `aria-hidden` because it says nothing: the app announces itself a
+      moment later.
+    -->
+    <div class="loader" data-loader aria-hidden="true">
+      <img class="loader__mark" src="/favicon.svg" alt="" width="56" height="56" />
+      <span class="loader__bar"><span></span></span>
+    </div>
+
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

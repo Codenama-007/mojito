@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import Lenis from 'lenis'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { useStore } from '../store/useStore.js'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -87,6 +88,26 @@ export function useLenis() {
 
     lenisInstance = lenis
 
+    /*
+     * The page is held still while the loader is up, because the loader is not
+     * something the visitor can see past: a swipe or a wheel over it would move
+     * the page underneath and then hand over a page nobody recognises. A stopped
+     * Lenis cancels both (`if (this.isStopped || this.isLocked) { preventDefault;
+     * return }`), which is the same mechanism the mobile menu uses, and it is why
+     * the loader needs no gesture rules of its own.
+     *
+     * Held here rather than in the Loader because this is where the instance
+     * lives: a child's effect runs before the app's, so the Loader would always
+     * ask for an instance that does not exist yet.
+     */
+    if (useStore.getState().booting) lenis.stop()
+
+    const unsubscribe = useStore.subscribe((state, previous) => {
+      if (state.booting === previous.booting) return
+      if (state.booting) lenis.stop()
+      else lenis.start()
+    })
+
     const handleScroll = () => ScrollTrigger.update()
     lenis.on('scroll', handleScroll)
 
@@ -97,6 +118,7 @@ export function useLenis() {
     ScrollTrigger.refresh()
 
     return () => {
+      unsubscribe()
       gsap.ticker.remove(tick)
       lenis.off('scroll', handleScroll)
       lenis.destroy()

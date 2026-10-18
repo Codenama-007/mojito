@@ -53,6 +53,7 @@ class Window {
   scrollX = 0
   scrollY = 0
   lenis = {}
+  listeners = new Map()
 
   matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} })
 
@@ -62,9 +63,43 @@ class Window {
     this.scrollY = Math.round(options.top ?? 0)
   }
 
-  addEventListener() {}
-  removeEventListener() {}
+  addEventListener = (type, handler) => {
+    this.listeners.set(type, [...(this.listeners.get(type) ?? []), handler])
+  }
+
+  removeEventListener = (type, handler) => {
+    this.listeners.set(type, (this.listeners.get(type) ?? []).filter((entry) => entry !== handler))
+  }
+
   dispatchEvent() {}
+
+  /**
+   * Hands a gesture to whatever registered for it — Lenis puts wheel and touch
+   * listeners here — and reports back whether it was cancelled. `cancelable` and
+   * `preventDefault` are the parts that matter: Lenis holds a page still by
+   * cancelling the gesture, not by ignoring it.
+   */
+  fire = (type, init = {}) => {
+    const event = {
+      type,
+      deltaX: 0,
+      deltaY: 0,
+      deltaMode: 0,
+      clientX: 0,
+      clientY: 0,
+      ctrlKey: false,
+      cancelable: true,
+      defaultPrevented: false,
+      preventDefault() {
+        event.defaultPrevented = true
+      },
+      composedPath: () => [documentStub.documentElement],
+      ...init,
+    }
+
+    for (const handler of this.listeners.get(type) ?? []) handler(event)
+    return event
+  }
 }
 
 const windowStub = new Window()
@@ -114,6 +149,11 @@ globalThis.document = documentStub
 // Lenis decides how to measure the page with `wrapper instanceof Window`, so the
 // stub window has to be an instance of a real global `Window`.
 globalThis.Window = Window
+// Handed a number — the position a wheel moves the page to — Lenis asks `target
+// instanceof Element` before it accepts it as a destination, so the class has to
+// exist here too. Nothing in this file is an instance: a stub element is a plain
+// object, which is the answer Lenis wants for every number it is given.
+globalThis.Element = class Element {}
 // Node 22 ships a `navigator` with a getter and no setter, so this is defined
 // rather than assigned.
 Object.defineProperty(globalThis, 'navigator', {
@@ -144,10 +184,20 @@ globalThis.cancelAnimationFrame = () => {}
 const { default: Lenis } = await import('lenis')
 const { scrollToSection, SCROLL_OFFSET } = await import('../src/hooks/useLenis.js')
 
+/** Every live instance, so a gesture can be handed to exactly one of them. */
+const live = []
+
 /** Lenis, fresh, with the page parked at `scrollY`. */
 const newLenis = (scrollY = 0) => {
   windowStub.scrollY = scrollY
-  return new Lenis({ duration: 1, autoRaf: false })
+  const lenis = new Lenis({ duration: 1, autoRaf: false })
+  live.push(lenis)
+  return lenis
+}
+
+/** Takes every listener off the stub window, so the next gesture reaches one Lenis. */
+const disposeAll = () => {
+  while (live.length) live.pop().destroy()
 }
 
 /** Turn the rAF handle by hand: 90 frames is 1.44s, past a one-second scroll. */
@@ -246,6 +296,66 @@ for (const id of SECTION_ORDER) {
     'with no Lenis at all, the link still moves the page',
     windowStub.scrollY === SECTION_TOPS.faq + SCROLL_OFFSET,
     `landed at ${windowStub.scrollY}px`,
+  )
+}
+
+/* --- Holding the page still --------------------------------------------- */
+
+/*
+ * The loader in index.html holds the page while the scene loads, and the mobile
+ * menu holds it while it is open, and both do it the same way: `lenis.stop()`. So
+ * "a stopped Lenis does not let the page move" is not a detail of that feature, it
+ * is the feature — relied on in two places, and until now asserted in neither.
+ *
+ * Hence a gesture, made here rather than waited for. A stopped Lenis *cancels* the
+ * event rather than pretending not to see it, which is what stops a phone panning
+ * natively under a loader it cannot see past.
+ */
+disposeAll()
+
+{
+  const lenis = newLenis()
+  lenis.stop()
+
+  const wheel = windowStub.fire('wheel', { deltaY: 400 })
+  windowStub.fire('touchstart', { clientY: 100, targetTouches: [{ clientY: 100 }] })
+  const touch = windowStub.fire('touchmove', { clientY: 60, targetTouches: [{ clientY: 60 }] })
+  const landed = runFrames(lenis)
+
+  check(
+    'a stopped Lenis cancels a wheel, so nothing moves behind the loader',
+    wheel.defaultPrevented && landed === 0,
+    `prevented ${wheel.defaultPrevented}, landed at ${landed}px`,
+  )
+  check(
+    'and cancels a touch, so a phone cannot pan under it either',
+    touch.defaultPrevented,
+  )
+}
+
+disposeAll()
+
+{
+  const lenis = newLenis()
+
+  const wheel = windowStub.fire('wheel', { deltaY: 400 })
+  const landed = runFrames(lenis)
+  windowStub.fire('touchstart', { clientY: 100, targetTouches: [{ clientY: 100 }] })
+  const touch = windowStub.fire('touchmove', { clientY: 60, targetTouches: [{ clientY: 60 }] })
+
+  // A wheel is cancelled either way — a smooth scroller has to swallow the native
+  // one to animate it itself — so the position is the only thing that tells the two
+  // states apart. A touch is cancelled only by the stop: a running Lenis leaves it
+  // "native", which is how a phone scrolls this page at all.
+  check(
+    'the same wheel on a running Lenis does move the page',
+    landed === 400,
+    `landed at ${landed}px — without this, the check above would prove nothing`,
+  )
+  check(
+    'and a touch it is not holding is left to the browser',
+    !touch.defaultPrevented,
+    'wanting to cancel everything is how a page stops scrolling on a phone',
   )
 }
 

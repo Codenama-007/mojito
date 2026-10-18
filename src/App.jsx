@@ -6,6 +6,7 @@ import About from './ui/About.jsx'
 import BrandFacts from './ui/BrandFacts.jsx'
 import Faq from './ui/Faq.jsx'
 import Contact from './ui/Contact.jsx'
+import Loader from './ui/Loader.jsx'
 import Scene from './three/Scene.jsx'
 import { flavors, getFlavor } from './config/flavors.js'
 import { CONTACT_ID } from './config/sections.js'
@@ -59,6 +60,9 @@ export default function App() {
 
         <Contact />
       </main>
+
+      {/* Retires the loader in index.html, and renders nothing itself. */}
+      <Loader />
     </div>
   )
 }

@@ -251,6 +251,104 @@ check(
   'index.css keys its hide rule off this attribute',
 )
 
+/* --- The loader ---------------------------------------------------------- */
+
+/*
+ * The loader exists in `index.html`, before any module has run, and React only
+ * ever *removes* it. That split is what makes it worth checking in two directions:
+ * the document half is asserted against the built bytes, and the half that decides
+ * when it goes away is read out of the source, because this script has no browser
+ * to run it in.
+ *
+ * What is at stake is a first impression that cannot be re-tested by scrolling: a
+ * loader that ships, styled, text-free, over a scene that is actually lit — and
+ * that always comes down.
+ */
+console.log('\nthe loader\n')
+
+const styleBlocks = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map((match) => match[1])
+const inlineStyles = styleBlocks.join('\n')
+const loaderHtml = html.match(/<div[^>]*data-loader[^>]*>[\s\S]*?<\/div>/)?.[0] ?? ''
+
+check('a loader ships in the page source', loaderHtml !== '', 'index.html carries data-loader')
+check('it carries the brand mark', loaderHtml.includes('/favicon.svg'))
+check(
+  'and says nothing',
+  textOf(loaderHtml) === '',
+  'everything in the response body is content as far as a crawler is concerned',
+)
+
+const styleRule = (selector) => {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return inlineStyles.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? null
+}
+
+check(
+  'its styles ship with it, in the document rather than the bundle',
+  styleRule('.loader') !== null &&
+    styleRule('.loader.is-done') !== null &&
+    styleRule('.loader__mark') !== null &&
+    styleRule('.loader__bar span') !== null,
+  'dev injects the app stylesheet from the module graph, so an inline rule is the only one that applies in time',
+)
+
+/**
+ * The loader sits on the page's own lime, so the handoff is a fade between two
+ * identical colours. Asserted by value: the token is the source, and a literal
+ * beside it is a copy that has to agree with it.
+ */
+const fallbackBg = readFileSync('src/index.css', 'utf8').match(/--fallback-bg:\s*(#[0-9a-f]{3,8})/i)?.[1]
+const loaderBackground = (styleRule('.loader') ?? '').match(/background:\s*([^;]+);/)?.[1] ?? ''
+const loaderHex = loaderBackground.match(/#[0-9a-f]{3,8}/i)?.[0]
+
+check(
+  'it is painted the page background, not a colour of its own',
+  loaderBackground.includes('var(--fallback-bg') && loaderHex === fallbackBg,
+  `${loaderBackground.trim()} against --fallback-bg: ${fallbackBg}`,
+)
+
+/** The app has to look for what the document actually wrote, or it never leaves. */
+const loaderSource = readFileSync('src/ui/Loader.jsx', 'utf8')
+const loaderSelectors = [...loaderSource.matchAll(/querySelector\('([^']+)'\)/g)].map(
+  (match) => match[1],
+)
+
+check(
+  'the app looks for the node the document wrote',
+  loaderSelectors.length > 0 &&
+    loaderSelectors.every((selector) => {
+      const attribute = selector.match(/^\[([a-z-]+)\]$/i)?.[1]
+      return attribute ? new RegExp(`\\s${attribute}(\\s|>|=)`).test(html) : html.includes(selector)
+    }),
+  loaderSelectors.join(' ') || 'no selector found in Loader.jsx',
+)
+check(
+  'and something mounts it',
+  /import Loader from '\.\/ui\/Loader\.jsx'/.test(readFileSync('src/App.jsx', 'utf8')) &&
+    /<Loader\s*\/>/.test(readFileSync('src/App.jsx', 'utf8')),
+  'the loader only comes down if App renders the component that retires it',
+)
+check(
+  'the loader has a way out if the scene never reports ready',
+  /setTimeout\(/.test(loaderSource) && /setBooting\(false\)/.test(loaderSource),
+)
+
+/**
+ * The scene reports ready from inside the boundary the environment map loads in,
+ * so a loader that lifts does so on a lit cup rather than a flat one. Written as a
+ * search for the boundary close between the two tags rather than as one pattern, so
+ * reformatting the component cannot quietly move the signal out of it.
+ */
+const sceneSource = readFileSync('src/three/Scene.jsx', 'utf8')
+const envAt = sceneSource.indexOf('<Environment')
+const signalAt = sceneSource.indexOf('<ReadySignal')
+
+check(
+  'the ready signal waits inside the environment boundary',
+  envAt > -1 && signalAt > envAt && !sceneSource.slice(envAt, signalAt).includes('</Suspense>'),
+  'moved out, it fires at once and the loader lifts on an unlit cup',
+)
+
 /* --- Structured data ---------------------------------------------------- */
 
 console.log('\nstructured data\n')
