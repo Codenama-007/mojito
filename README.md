@@ -52,6 +52,7 @@ data, not components, and neither belongs inside one.
 ## Layout
 
 ```
+index.html               <- the shell, and the loader's markup and styles
 src/
   main.jsx
   App.jsx                <- page sections and hooks
@@ -110,7 +111,7 @@ src/
     Contact.jsx          <- phone, email, and the order button
     FlavorCards.jsx      <- not built yet
     OrderCTA.jsx         <- not built yet
-    Loader.jsx           <- not built yet
+    Loader.jsx           <- retires the loading screen index.html paints
   seo/
     staticHtml.js        <- the same copy, as plain HTML, for the build
   hooks/
@@ -136,6 +137,7 @@ scripts/
   verify-cup-fit.mjs     <- the cup fits the screen in every section
   verify-fruit-field.mjs <- shader hooks, art, framing, push and spin geometry
   verify-brand.mjs       <- brand details and flavor copy
+  verify-contrast.mjs    <- text on a background the shatter flips, measured
   verify-nav.mjs         <- nav links, tap targets, and a real Lenis driven for real
   verify-static-html.mjs <- builds, reads the page source, renders the accordion
 ```
@@ -304,6 +306,59 @@ and is lowered further toward 1 during play if the frame rate stays under 45.
 Rendering stops while the tab is hidden. Smooth scroll is Lenis, driven by the
 GSAP ticker so the page has a single rAF loop. Lenis honours
 `prefers-reduced-motion` by collapsing to 1:1 scroll.
+
+## The loading screen
+
+The page is a scene, and a scene takes a moment: a gzip'd 400 kB of JavaScript
+before the first pixel of interface exists, then a 1.4 MB environment map before
+the cup looks like the cup. Left alone, a phone on a slow connection shows the
+brand's lime for a second, then the page with an unlit cup that brightens.
+
+So the loader is **painted by `index.html`, not by React**, and React only takes it
+away. It has to be: nothing React renders can exist before React does, and the
+point is to cover the half second when only the document is on screen. That splits
+its job in two, and both halves are checked:
+
+- **The document half**, in the page source: a mark, a sweeping bar, and no text.
+  No text on purpose — everything in the response body is content as far as a
+  crawler is concerned, and "Loading" is not something this brand has to say.
+  `verify-static-html.mjs` reads the built bytes and asserts it ships, carries the
+  mark, says nothing, and that its styles are *in the document* rather than in the
+  bundle. That last one is not fussiness: a build links the app's CSS in the head
+  where it would work, but dev injects it from the module graph, so an inline rule
+  is the only one that applies in time in both.
+- **The React half**, in `Loader.jsx`, which renders nothing and owns only the
+  lifetime. What React knows and the document cannot is *when the scene is worth
+  showing*.
+
+**What "ready" means is the environment map.** The cup's material is built on
+image-based lighting, so arriving before it means arriving flat and brightening a
+second later — the exact pop the loader exists to hide. `three/Scene.jsx` renders a
+component inside the same `Suspense` boundary the map loads in, so React mounts it
+when the map has arrived and not a frame sooner. Move it out of that boundary and
+it fires immediately; the verifier asserts the position structurally, by looking for
+a boundary close between the two tags, so reformatting cannot quietly move it.
+
+**And it always comes down.** Ten seconds is the backstop for a map that 404s or a
+GPU that will not build a context: a page that is merely unlit is worth more than a
+page nobody can reach. (A crash in the render tree still takes the component with
+it, so the WebGL-unavailable fallback in AGENTS §7 remains the open item it was.)
+
+**The page is held while it is up.** `useLenis` stops the instance while `booting`
+is true and starts it when the loader goes, because a wheel or a swipe over the
+loader would move the page underneath and then hand over a page nobody recognises.
+A stopped Lenis cancels both gestures, which is the same mechanism the mobile menu
+uses — and `verify-nav.mjs` now proves it with a real Lenis and a synthetic wheel
+rather than trusting the source. The hold lives in the hook and not in `Loader`
+because a child's effect runs before the app's: the component would always be
+asking for an instance that does not exist yet.
+
+Two smaller decisions. The loader sits on `--fallback-bg`, the page's own lime, so
+the handoff is a fade between two identical colours (asserted by value against the
+token). And it is removed by a timer rather than by `transitionend`, which never
+fires when the visitor has asked for reduced motion and the transition is off.
+
+It is called the loader, not the splash: `Splash.jsx` is the juice leaving the cup.
 
 ## The navbar, and going to a section
 
@@ -561,6 +616,17 @@ the DOM.
 The verifier computes the contrast of the ink against each flavor's base colour
 *after* the 15% wash and requires 4.5:1. All four pass, the lowest at 5.69:1.
 
+**A flip needs both colours to flip.** The order button is a pill painted
+`background: var(--ink)` and labelled `#fff` — and the state it appears in is the
+shaded one, where that ink is a cream, so the label was white on white. Every
+suite in this repo was green, because none of them multiplied two declarations of
+the same rule together. `scripts/verify-contrast.mjs` now does: it reads the tokens
+that `.app--shaded` redefines out of the stylesheet and the class name out of
+`App.jsx`, walks every rule in `src/`, fails any that paints a flipped background
+and writes its text in a fixed colour, and resolves the rest in both states and
+requires 4.5:1 of them. The button's label is `--on-ink` — a token that moves with
+the ink — and now measures 15.6:1 shaded.
+
 ## The shatter
 
 Approaching the contact section, `breakProgress` runs 0 to 1, scrubbed by
@@ -615,3 +681,7 @@ pnpm verify
       ("phase-9b: nav links scroll to their section")
 - [ ] 9. Mobile optimization pass
 - [ ] 10. Loader, SEO, deploy to Vercel
+      - [x] The loader, so the first frame is the lit cup ("phase-10: the loader")
+      - [x] Fix. The order button was white on white while the page is shaded
+            ("phase-10: the order button")
+      - [ ] SEO pass and deploy

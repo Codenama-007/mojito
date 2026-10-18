@@ -10,6 +10,10 @@
   --surface: rgba(255, 255, 255, 0.78);
   --border: rgba(22, 33, 15, 0.16);
   --fallback-bg: #d2f261;
+  /* Written on `--ink` rather than on the page: a solid pill is ink-coloured, so
+     its label is the paper the ink would have been written on. It has to move with
+     `--ink`, which is why it is a token and not a `#fff`. */
+  --on-ink: #fff;
 
   /* Navbar height, used for scroll offsets and section top padding. */
   --nav-h: 64px;
@@ -63,6 +67,7 @@ button {
   --ink-soft: rgba(242, 250, 230, 0.74);
   --surface: rgba(16, 26, 12, 0.55);
   --border: rgba(242, 250, 230, 0.22);
+  --on-ink: #16210f;
 
   color: var(--ink);
 }

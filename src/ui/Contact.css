@@ -68,7 +68,9 @@
   padding: 0 26px;
   border-radius: 999px;
   background: var(--ink);
-  color: #fff;
+  /* `--on-ink`, not `#fff`: the shatter flips `--ink` to a cream, and a label left
+     white would make this a blank pill as soon as the page shades. */
+  color: var(--on-ink);
   font-size: 16px;
   font-weight: 650;
   text-decoration: none;
