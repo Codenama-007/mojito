@@ -5,6 +5,7 @@ import { quality } from '../config/performance.js'
 import { useAdaptiveQuality } from '../hooks/useAdaptiveQuality.js'
 import Ground from './Ground.jsx'
 import MojitoGroup from './MojitoGroup.jsx'
+import FruitField from './FruitField.jsx'
 import { useGlassBaseScale } from '../hooks/useGlassBaseScale.js'
 
 /** Env map shipped in public/, so no CDN request and no runtime build step. */
@@ -20,6 +21,9 @@ function Stage() {
 
   return (
     <>
+      {/* Phase 8B. Behind the cup, and drawn first: it is in the canvas rather
+          than in the DOM precisely so the cup can stand in front of it. */}
+      <FruitField />
       <MojitoGroup baseScale={baseScale} />
       <Ground baseScale={baseScale} />
     </>

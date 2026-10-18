@@ -90,6 +90,72 @@ export const NAVBAR_HEIGHT_PX = 64
 export const MOBILE_GLASS_Y_OFFSET = 0.11
 
 /**
+ * Phase 8B. The fruit field behind the cup.
+ *
+ * `far` / `mid` / `near` are the most opaque a fruit in that layer is allowed
+ * to be, and `overlay` is the flat dark wash over the whole page that keeps body
+ * copy legible on top of a field of bright fruit. These four are the numbers the
+ * brief names, and they are the ones to tune if the background reads too busy or
+ * too flat.
+ */
+export const FRUIT_FIELD_OPACITY = {
+  far: 0.25,
+  mid: 0.4,
+  near: 0.55,
+  overlay: 0.15,
+}
+
+/**
+ * How far out of focus each layer reads, as the fraction of a fruit's radius
+ * over which its edge fades out. A far fruit has no hard silhouette at all; a
+ * near one is only just soft.
+ */
+export const FRUIT_FIELD_SOFTNESS = { far: 0.92, mid: 0.6, near: 0.34 }
+
+/**
+ * How far towards the top of the screen each layer drifts as the page scrolls,
+ * as a fraction of the viewport height. Near layers move further, which is what
+ * makes the field read as having depth rather than as one flat picture.
+ */
+export const FRUIT_FIELD_PARALLAX = { far: 0.03, mid: 0.07, near: 0.11 }
+
+/**
+ * A flavor change, as one thing rather than three.
+ *
+ * The whole background moves together: the outgoing base color and the outgoing
+ * fruit field both slide out to one side while the incoming pair slides in from
+ * the other. Driving the CSS and the frame loop from one duration and one linear
+ * schedule is what keeps the two in step — the fruit is painted on the color, so
+ * a drift between them would be visible as the fruit sliding over its own base.
+ *
+ * Linear, deliberately. Any easing would have to be implemented twice, once in
+ * the keyframes and once in `Field`'s frame loop, and two easing curves that
+ * are meant to match but do not is a worse look than a wipe that is merely
+ * even. Change `FLAVOR_PUSH` freely; change the easing in one place only at
+ * your peril.
+ *
+ * `FLAVOR_PUSH_DISTANCE` is how far each layer travels, as a fraction of the
+ * viewport width, and 1 is exactly off-screen. The cup's spin runs a little
+ * longer than the push, so the spin settles after the background has landed
+ * rather than with it.
+ */
+export const FLAVOR_PUSH = 0.8
+
+export const FLAVOR_PUSH_DISTANCE = 1
+
+/** Seconds for the cup's one full turn on a flavor change. */
+export const FLAVOR_SPIN = 0.9
+
+/**
+ * How far the page darkens for the shatter, and towards what.
+ *
+ * The darkening is a class toggle rather than a per-frame style write, so the
+ * fade is a CSS transition and the scroll loop still touches nothing in the DOM.
+ */
+export const BACKDROP_SHADE = 0.72
+export const BACKDROP_SHADE_COLOR = '#101a0c'
+
+/**
  * Exported so scripts/verify-*.mjs can assert both tiers. At runtime only
  * `quality` below is read; nothing else should index this directly.
  *
@@ -124,6 +190,8 @@ export const TIERS = {
     ambientDroplets: 6,
     splashOpacity: 0.8,
     splashRingOpacity: 0.7,
+    /** Phase 8B: planes per fruit type in the background field. Two types. */
+    fruitFieldCount: 22,
     plastic: {
       opacity: 0.2,
       roughness: 0.08,
@@ -163,6 +231,7 @@ export const TIERS = {
     ambientDroplets: 10,
     splashOpacity: 0.85,
     splashRingOpacity: 0.75,
+    fruitFieldCount: 40,
     plastic: {
       opacity: 0.2,
       roughness: 0.08,

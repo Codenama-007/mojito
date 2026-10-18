@@ -1,7 +1,7 @@
-/* Fixed background layer: a flavor gradient plus soft out-of-focus blobs.
-   Kept behind the canvas (z-index 0) and never interactive. */
+/* Fixed background: a solid flavor colour, with the fruit field drawn in the
+   canvas above it. Behind the canvas (z-index 0) and never interactive. */
 
-.backdrop {
+.backdrop__stage {
   position: fixed;
   inset: 0;
   z-index: 0;
@@ -9,51 +9,107 @@
   pointer-events: none;
 }
 
-/* The outgoing flavor rides on top of the incoming one and fades away, so the
-   new mood is already in place underneath it. `forwards` holds it at zero until
-   its animationend handler unmounts it. */
-.backdrop--previous {
+.backdrop {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+/* ---------------------------------------------------------------------------
+   The flavor push.
+
+   The outgoing colour leaves to one side while the incoming one arrives behind
+   it, both travelling exactly one viewport on the same clock — the two layers
+   are always one viewport apart, so the screen is covered for the whole move.
+
+   `--push` is the sign, from the direction through the flavor list, so what goes
+   out one way comes back the other. `linear` is deliberate and load-bearing:
+   `FruitField.jsx` moves the fruit in the canvas on the same schedule, and any
+   easing here would have to be written a second time there. Two curves meant to
+   match and slightly not is a worse look than an even wipe.
+
+   The fruit field is wider than a viewport, so a sliver of it is still on screen
+   when the colour has finished leaving. It is only invisible because its own
+   alpha has reached zero by then — see the fade in FruitField.jsx.
+   --------------------------------------------------------------------------- */
+
+.backdrop--entering {
   z-index: 1;
-  animation: backdrop-out 700ms ease forwards;
+  animation: backdrop-in var(--push-duration, 800ms) linear forwards;
+}
+
+.backdrop--previous {
+  z-index: 2;
+  animation: backdrop-out var(--push-duration, 800ms) linear forwards;
+}
+
+@keyframes backdrop-in {
+  from {
+    transform: translateX(calc(var(--push-distance, 100%) * var(--push, 1)));
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 
 @keyframes backdrop-out {
   from {
-    opacity: 1;
+    transform: translateX(0);
   }
   to {
-    opacity: 0;
+    transform: translateX(calc(var(--push-distance, 100%) * var(--push, 1) * -1));
   }
 }
 
-/* Radial gradients rather than `filter: blur()` on a solid: a gradient is
-   rasterised once by the compositor, whereas a large blurred layer has to be
-   filtered every frame on the GPU. This is the cheap way to get bokeh. */
-.backdrop__bokeh {
+/* A flat wash rather than a gradient. It exists so a page full of bright fruit
+   still has somewhere for body copy to land. The strength is
+   FRUIT_FIELD_OPACITY.overlay, handed in from Backdrop.jsx. */
+.backdrop__overlay {
   position: absolute;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  animation: bokeh-drift 19s ease-in-out infinite alternate;
+  inset: 0;
+  z-index: 3;
+  background: rgba(16, 26, 12, var(--backdrop-overlay, 0.15));
 }
 
-@keyframes bokeh-drift {
-  from {
-    transform: translate(-50%, -50%) scale(1);
-  }
-  to {
-    transform: translate(-46%, -55%) scale(1.12);
-  }
+/* Subtle, and all that is left of Phase 4's bokeh: a soft edge so the fruit
+   field tapers off towards the corners instead of stopping at a hard crop. It
+   does not move with the push: it belongs to the frame, not to a flavor. */
+.backdrop__vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: radial-gradient(
+    ellipse at 50% 45%,
+    rgba(16, 26, 12, 0) 40%,
+    rgba(16, 26, 12, 0.18) 100%
+  );
+}
+
+/* The shatter: the fruit field fades out in the canvas and this fades in behind
+   it. A transition on a class, so nothing writes to the DOM per frame. */
+.backdrop__shade {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: var(--backdrop-shade-color, #101a0c);
+  opacity: 0;
+  transition: opacity 700ms ease;
+}
+
+.backdrop__shade.is-on {
+  opacity: var(--backdrop-shade, 0.72);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* Not `animation: none`: the layer would then sit at full opacity until it
-     unmounts and the old flavor would linger. Instead the fade is made
-     instant, so the switch is a clean cut. */
+  /* Not `animation: none`: the layer would then sit where it starts — the old
+     flavour parked at full opacity over the new one, for good. Instead the move
+     is made instant, so the switch is a clean cut with nothing left over. */
+  .backdrop--entering,
   .backdrop--previous {
     animation-duration: 1ms;
   }
 
-  .backdrop__bokeh {
-    animation: none;
+  .backdrop__shade {
+    transition-duration: 1ms;
   }
 }

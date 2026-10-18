@@ -33,8 +33,10 @@
  *                                       white (three/Liquid.jsx), so a pale straw would
  *                                       vanish into it.
  * @property {string} accentColor        UI accent for this flavor, hex.
- * @property {string} backgroundGradient Full CSS background-image value.
- * @property {number[][]} bokeh          Out-of-focus blobs: [x%, y%, sizeVmax, alpha].
+ * @property {string} colorA             The backdrop base: this flavor's own color a shade
+ *                                       down. Solid, not a gradient — Phase 8B's fruit
+ *                                       field is what gives the background its depth now,
+ *                                       and a gradient behind it only muddied the fruit.
  * @property {string} tagline            One short line of copy.
  * @property {FlavorProperty[]} properties  Exactly three chips.
  * @property {FlavorFruit} fruit         The slice that floats in the glass.
@@ -48,15 +50,7 @@ export const flavors = [
     splashTint: '#E9FF8F',
     accentColor: '#5F8A00',
     strawColor: '#3E8E1E',
-    backgroundGradient:
-      'linear-gradient(180deg, #F6FFDE 0%, #D2F261 55%, #97CA20 100%)',
-    bokeh: [
-      [14, 16, 54, 0.5],
-      [84, 12, 42, 0.34],
-      [70, 76, 58, 0.3],
-      [20, 88, 38, 0.26],
-      [48, 44, 30, 0.16],
-    ],
+    colorA: '#B6E23C',
     tagline: 'Sharp enough to wake you up.',
     properties: [
       { label: 'Taste', value: 'Sharp citrus' },
@@ -85,15 +79,7 @@ export const flavors = [
     splashTint: '#FF9DB1',
     accentColor: '#C9184A',
     strawColor: '#E0244A',
-    backgroundGradient:
-      'linear-gradient(180deg, #FFF0F3 0%, #FFB6C4 55%, #FF5C8A 100%)',
-    bokeh: [
-      [78, 20, 50, 0.46],
-      [16, 10, 40, 0.3],
-      [26, 78, 60, 0.32],
-      [86, 70, 36, 0.24],
-      [56, 48, 26, 0.18],
-    ],
+    colorA: '#FF8AA6',
     tagline: 'Summer, muddled.',
     properties: [
       { label: 'Taste', value: 'Soft and sweet' },
@@ -121,15 +107,7 @@ export const flavors = [
     splashTint: '#A9E9A3',
     accentColor: '#1E7A2E',
     strawColor: '#2F9E44',
-    backgroundGradient:
-      'linear-gradient(180deg, #EFFBEF 0%, #B9E7A9 55%, #6CCB57 100%)',
-    bokeh: [
-      [10, 62, 52, 0.42],
-      [88, 34, 44, 0.32],
-      [44, 12, 34, 0.28],
-      [72, 88, 46, 0.24],
-      [34, 40, 28, 0.15],
-    ],
+    colorA: '#93D97F',
     tagline: 'Crisp enough to hear.',
     properties: [
       { label: 'Taste', value: 'Dry, green crunch' },
@@ -157,15 +135,7 @@ export const flavors = [
     splashTint: '#FFD98C',
     accentColor: '#C25E00',
     strawColor: '#F08C0B',
-    backgroundGradient:
-      'linear-gradient(180deg, #FFF7E6 0%, #FFD98A 55%, #FFA51F 100%)',
-    bokeh: [
-      [50, 14, 62, 0.44],
-      [18, 46, 40, 0.3],
-      [86, 58, 48, 0.32],
-      [64, 90, 36, 0.22],
-      [30, 80, 26, 0.16],
-    ],
+    colorA: '#FFC24F',
     tagline: 'Thick sun, poured slow.',
     properties: [
       { label: 'Taste', value: 'Thick and tropical' },
@@ -207,4 +177,28 @@ export const defaultFlavor = flavors[0]
  */
 export function getFlavor(id) {
   return flavors.find((flavor) => flavor.id === id) ?? defaultFlavor
+}
+
+/**
+ * Which way through the flavor list a change travels: +1 towards the last
+ * flavor, -1 towards the first.
+ *
+ * The background push and the cup's spin both read this, so stepping forward
+ * through the flavors always pushes and spins the same way and stepping back
+ * undoes it. That symmetry is the point: a change you can reverse should look
+ * reversible.
+ *
+ * Unknown ids and a change to the flavor already showing both resolve to +1,
+ * so callers never have to handle a direction of zero.
+ *
+ * @param {string} fromId
+ * @param {string} toId
+ * @returns {1 | -1}
+ */
+export function flavorDirectionFor(fromId, toId) {
+  const from = flavors.findIndex((flavor) => flavor.id === fromId)
+  const to = flavors.findIndex((flavor) => flavor.id === toId)
+
+  if (from === -1 || to === -1 || from === to) return 1
+  return to > from ? 1 : -1
 }

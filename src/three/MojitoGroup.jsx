@@ -8,6 +8,7 @@ import {
   CUP_TILT_X,
   CUP_TILT_Z,
   CUP_TOP_CLEARANCE,
+  FLAVOR_SPIN,
   MOBILE_GLASS_Y_OFFSET,
   NAVBAR_HEIGHT_PX,
   isMobile,
@@ -37,6 +38,13 @@ const DROP_DISTANCE = 0.16
 const TILT_Z = toRadians(CUP_TILT_Z)
 const TILT_X = toRadians(CUP_TILT_X)
 const SWAY = toRadians(CUP_SWAY)
+
+/**
+ * The cup's welcome for a new flavor, eased so it arrives rather than stops.
+ * Cubic out: quick off the mark, gentle into the finish, and — the property
+ * that matters — exactly 0 at 0 and exactly 1 at 1.
+ */
+const easeOutCubic = (t) => 1 - (1 - t) ** 3
 
 /**
  * The one cup, choreographed. Everything the scroll does to it happens here and
@@ -83,6 +91,18 @@ export default function MojitoGroup({ baseScale }) {
    * invalidate the fit below.
    */
   const bounds = useRef({ top: 0, height: 0 })
+
+  /**
+   * The flavor-change spin: which flavor it belongs to, how far through it is,
+   * and which way round it goes.
+   *
+   * Started by watching `activeFlavor` in the frame loop rather than by an
+   * effect, because the loop is where the value is *used* and an effect would
+   * cost a render to do the same thing. `flavor` starts null so the first frame
+   * records the flavor without spinning: the page loads onto a cup that is
+   * already there, not one that turns up.
+   */
+  const spin = useRef({ flavor: null, t: 1, direction: 1 })
 
   const measure = useCallback(() => {
     const group = groupRef.current
@@ -134,7 +154,8 @@ export default function MojitoGroup({ baseScale }) {
     const group = groupRef.current
     if (!group) return
 
-    const { activeSection, breakProgress } = useStore.getState()
+    const { activeSection, breakProgress, activeFlavor, flavorDirection } =
+      useStore.getState()
     const targets = GLASS_TARGETS[activeSection] ?? FALLBACK_TARGET
     const target = targets[mode]
 
@@ -217,10 +238,38 @@ export default function MojitoGroup({ baseScale }) {
     const topLimit = viewport.height / 2 - clearance
     if (worldTop > topLimit) y -= worldTop - topLimit
 
+    /**
+     * Phase 8C. A full turn on every flavor change, however the change was
+     * made — a tap on the picker or a scroll into a flavor section both land in
+     * `activeFlavor`, so both spin, which is why there is only one rule here.
+     *
+     * The turn is added to the section yaw rather than replacing it, and it is
+     * a whole turn, so at t = 1 the angle is exactly 2 pi and the cup is back on
+     * the yaw the section asked for. Nothing has to be reset and no end state
+     * has to be reconciled: the spin is 0 modulo a turn.
+     */
+    if (spin.current.flavor === null) {
+      spin.current.flavor = activeFlavor
+    } else if (spin.current.flavor !== activeFlavor) {
+      spin.current.flavor = activeFlavor
+      spin.current.t = 0
+      spin.current.direction = flavorDirection
+    }
+
+    if (spin.current.t < 1) {
+      spin.current.t = Math.min(
+        1,
+        spin.current.t + (prefersReducedMotion ? 1 : delta / FLAVOR_SPIN),
+      )
+    }
+
+    const spinAngle =
+      easeOutCubic(spin.current.t) * Math.PI * 2 * spin.current.direction
+
     group.position.x = current.x + shakeX
     group.position.y = y
     group.scale.setScalar(current.scale)
-    group.rotation.y = current.rot + swayY
+    group.rotation.y = current.rot + swayY + spinAngle
     // The yaw stays out here and the lean lives on the tilt group, so the two
     // can never compose into a roll the section targets did not ask for.
     group.rotation.z = 0

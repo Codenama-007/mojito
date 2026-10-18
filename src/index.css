@@ -55,6 +55,18 @@ button {
   position: relative;
 }
 
+/* The shatter darkens the whole page (Backdrop.css), so the ink has to flip
+   with it. Overriding the tokens on one element beats restyling every section
+   for a state that lasts a second and a half. */
+.app--shaded {
+  --ink: #f2fae6;
+  --ink-soft: rgba(242, 250, 230, 0.74);
+  --surface: rgba(16, 26, 12, 0.55);
+  --border: rgba(242, 250, 230, 0.22);
+
+  color: var(--ink);
+}
+
 /* --- Fixed 3D layer ------------------------------------------------------ */
 
 .scene {

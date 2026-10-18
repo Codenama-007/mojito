@@ -87,11 +87,16 @@ src/
     Splash.jsx           <- the juice burst that leaves the lid
     splashMath.js        <- pure, closed-form ballistic maths
     ingredientMath.js    <- pure, reversible ingredient maths
+    FruitField.jsx       <- the background fruit, cross-faded
+    fruitFieldScene.js   <- two InstancedMeshes and the per-frame walk
+    fruitFieldMath.js    <- pure layer, layout and drift maths
+    fruitFieldMaterial.js<- one material, two shader injections
+    fruitTextures.js     <- whole fruit and slice, drawn to a canvas
     shaders/
       liquid.js          <- liquid vertex + fragment
       plasticMaterial.js <- the one plastic recipe: cup, lid and shards
   ui/
-    Backdrop.jsx         <- flavor gradient + CSS bokeh, cross-faded
+    Backdrop.jsx         <- solid flavor base + readability layers, cross-faded
     Navbar.jsx           <- fixed bar, hamburger overlay under 768px
     Hero.jsx             <- headline + flavor picker
     FlavorSection.jsx    <- one component, rendered per flavor
@@ -110,6 +115,7 @@ src/
 public/
   images/glass.jpg       <- the owner's reference shot for the cup
   env/studio.hdr         <- 1.4 MB, environment map
+  backdrops/fruits/      <- OPTIONAL cutout sheets; see "The fruit field"
 prompts/                 <- the owner's prompts and session records
 scripts/
   verify-shatter.mjs     <- reversal + sanity checks for the shard maths
@@ -117,6 +123,7 @@ scripts/
   verify-whole-fruits.mjs<- orbit, clearance and cross-fade checks
   verify-splash.mjs      <- ballistics, fade and colour checks
   verify-cup-fit.mjs     <- the cup fits the screen in every section
+  verify-fruit-field.mjs <- shader hooks, framing, and backdrop contrast
 ```
 
 ## Contact details are placeholders
@@ -132,7 +139,8 @@ Scroll drives the journey. The glass stays pinned to the screen while seven
 sections pass: hero, four flavors, about, contact. Each flavor section moves
 the glass to one side (up and centre on mobile), rotates it slightly, and sets
 the active flavor, which lerps the liquid color over about half a second. The
-backdrop cross-fades between flavor gradients.
+backdrop cross-fades between flavors, and so does the field of fruit in front
+of it.
 
 Every scroll-driven value is written to the Zustand store by GSAP ScrollTrigger
 callbacks and read inside `useFrame`, so scrolling never re-renders React. The
@@ -258,12 +266,74 @@ Mint is the one ingredient that is not flavor data — every mojito gets the sam
 mint — so its greens are a separate export in the same file rather than four
 identical copies on the flavor objects.
 
-## The backdrop
+## The backdrop and the fruit field
 
-The flavor gradient and its bokeh blobs are both CSS. On a flavor change the
-outgoing layer is painted **over** the incoming one and fades away, which is the
-only arrangement where the fade is visible — put it underneath and the incoming
-opaque gradient hides it instantly, which is what Phase 3A was doing.
+Phase 8B split the background in two.
+
+**The base is a solid colour, not a gradient.** Each flavor carries a `colorA`
+in `config/flavors.js`, a shade down from its own colour, and `Backdrop.jsx`
+fills the screen with it. The Phase 4 gradient and its bokeh blobs are gone:
+they were doing the same job as the fruit field — giving the background depth —
+and two answers to one question only muddied each other. What replaced them is
+three thin layers over the base: a flat 15% wash for readability, a soft
+vignette so the fruit does not stop dead at the corners, and the shatter shade.
+
+**The depth comes from the fruit.** `FruitField.jsx` is a field of the active
+flavor's own fruit — limes and lime wheels, strawberries, apples and apple
+slices, mango pieces — dealt out behind the cup. It lives inside the canvas
+rather than in the DOM, which is the only way fruit can be *behind* the cup,
+and it is two `InstancedMesh`es: one for the whole fruit, one for the cut
+slices, 40 planes each on desktop and 22 on mobile. Two draw calls for eighty
+pieces of fruit.
+
+Every fruit is drawn to a 128 px canvas at runtime, from the same `fruit` block
+in `config/flavors.js` that the slices inside the cup are built from, so the
+background fruit and the drink cannot drift apart. Nothing is downloaded. If you
+would rather ship your own artwork, drop a transparent cutout sheet at
+`public/backdrops/fruits/<flavor-id>.webp` — whole fruit in the left half, a cut
+slice in the right — and it is used instead, resolved at build time so an absent
+folder costs no request and no 404.
+
+The field is three layers deep, far to near, and the brief's rules are all in
+`config/performance.js`: opacity ceilings 0.25 / 0.4 / 0.55, softness 0.92 / 0.6
+/ 0.34 (the far fruit is blurred almost away, the near fruit barely), and a
+scroll parallax of 0.03 / 0.07 / 0.11 of the viewport, so the far layers lag the
+near ones as you scroll. Each layer's fruit drifts and spins on a slow, seeded
+clock, and the field is dealt out to 145% of the frame so that parallax never
+uncovers an empty edge. A clear zone in the middle keeps fruit from sitting over
+the cup.
+
+Nothing in the field is lit, and no fruit writes depth, so none of it can pick up
+a highlight from the scene lights or cut a seam into the cup.
+
+The per-instance fade and the soft edge are two `onBeforeCompile` injections into
+a `MeshBasicMaterial` rather than a hand-written shader. Instancing is three's
+job — `instanceMatrix` and the attribute plumbing come free with a built-in
+material and have to be reimplemented in a raw `ShaderMaterial` — so the code is
+added to the built-in stages instead. `scripts/verify-fruit-field.mjs` asserts
+against three itself that every chunk the injection replaces still exists, and
+runs the injection against a stand-in shader to check what came out. That is the
+one failure mode here that no build would catch: a three upgrade that renames
+`#include <map_fragment>` produces a field of hard-edged squares, not an error.
+
+**The swap.** A flavor change does not cut. The outgoing flavor's field stays
+mounted, fades out and shrinks to 65% while the incoming one fades in from 82%
+over 0.8 s, and the base colour cross-fades under them: the outgoing opaque fill
+is painted *over* the incoming one and animates away, which is the only
+arrangement where a fade is visible at all — put it underneath and the incoming
+fill hides it instantly, which is what Phase 3A was doing. Both fields deal their
+fruit out from the same seed, so the fruit does not move — it changes colour in
+place. The extra field costs one draw call for 0.8 s.
+
+**The shatter takes it with it.** Once `breakProgress` passes 0.3 the field has
+faded to nothing, and the backdrop fades to a neutral dark behind it, so the cup
+breaks against a plain surface rather than a wall of fruit. That shade is a
+class on `.app`, and `src/index.css` flips the ink tokens under it — a class
+rather than a per-frame style write, so the scroll loop still touches nothing in
+the DOM.
+
+The verifier computes the contrast of the ink against each flavor's base colour
+*after* the 15% wash and requires 4.5:1. All four pass, the lowest at 5.69:1.
 
 ## The shatter
 
@@ -292,8 +362,8 @@ cone.
 `scripts/verify-ingredients.mjs` does the same job for the ingredients: the
 same reversal sweep, the appearance order, and a bounds check that walks every
 instance — and every vertex of every fruit slice and every leaf — against the
-plastic and the drink. The other three suites cover the whole fruit, the splash
-and the Phase 8A fit. They all run together:
+plastic and the drink. The other four suites cover the whole fruit, the splash,
+the Phase 8A fit and the Phase 8B field. They all run together:
 
 ```powershell
 pnpm verify
@@ -310,6 +380,6 @@ pnpm verify
 - [x] 5. Whole fruits and the juice splash (committed with "phase-7")
 - [x] 6. Takeaway cup, packed mint, wall bubbles (committed as "phase-7: takeaway cup")
 - [x] 7. Tilt right, and keep the straw on screen (committed as "phase-8a")
-- [ ] 8. Fruit-field background
+- [x] 8. Fruit-field background (committed as "phase-8b")
 - [ ] 9. Mobile optimization pass
 - [ ] 10. Loader, SEO, deploy to Vercel

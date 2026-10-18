@@ -7,7 +7,7 @@
     "dev": "vite --host",
     "build": "vite build",
     "lint": "eslint .",
-    "verify": "node scripts/verify-shatter.mjs && node scripts/verify-ingredients.mjs && node scripts/verify-whole-fruits.mjs && node scripts/verify-splash.mjs && node scripts/verify-cup-fit.mjs",
+    "verify": "node scripts/verify-shatter.mjs && node scripts/verify-ingredients.mjs && node scripts/verify-whole-fruits.mjs && node scripts/verify-splash.mjs && node scripts/verify-cup-fit.mjs && node scripts/verify-fruit-field.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
