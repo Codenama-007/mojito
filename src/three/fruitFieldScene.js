@@ -82,8 +82,14 @@ export function createFruitFieldScene(textures, count, viewport) {
      * @param {number} time     Seconds.
      * @param {number} scroll   Scroll progress, 0 to 1.
      * @param {number} opacity  The whole field's fade, 0 to 1.
+     * @param {number} slide    The push, in viewport widths. 0 is home; 1 is a
+     *   full viewport off to one side. Held here rather than by the component so
+     *   that the group's own transform is only ever written from the module that
+     *   built the group.
      */
-    update(time, scroll, opacity) {
+    update(time, scroll, opacity, slide = 0) {
+      group.position.x = slide * viewport.width
+
       for (const { mesh, instances, material } of fields) {
         material.userData.fieldUniforms.uFieldOpacity.value = opacity
 

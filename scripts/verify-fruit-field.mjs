@@ -180,7 +180,13 @@ function recordingContext() {
     closePath() {},
     fill() {},
     stroke() {},
-    createRadialGradient: () => ({ addColorStop: (at, value) => noteColour('stop', value) }),
+    // A gradient is a legitimate `fillStyle`, so it is marked as one and its
+    // stops are recorded as colours in their own right — which is where the
+    // interesting colours actually are.
+    createRadialGradient: () => ({
+      __gradient: true,
+      addColorStop: (at, value) => noteColour('stop', value),
+    }),
   }
 
   for (const [slot, field] of [
@@ -237,6 +243,7 @@ function reachOf(entry) {
 
 /** A colour is usable if a canvas would not silently ignore it. */
 function colourProblem(value) {
+  if (typeof value === 'object' && value !== null && value.__gradient) return null
   if (typeof value !== 'string') return `not a string: ${String(value)}`
 
   if (/^#[0-9a-f]{6}$/i.test(value)) return null
@@ -274,6 +281,10 @@ const recordLuminance = (value) => {
   return luminance(parts.slice(0, 3))
 }
 
+/** Only the string colours; the gradients are containers, not colours. */
+const recordedColours = (ctx) =>
+  ctx._colours.map((entry) => entry.value).filter((value) => typeof value === 'string')
+
 check(
   'every flavor kind is one the artwork knows how to draw',
   flavors.every((flavor) => FRUIT_KINDS.includes(flavor.fruit.kind)),
@@ -301,7 +312,7 @@ for (const flavor of flavors) {
       problems: ctx._colours
         .map((entry) => ({ ...entry, problem: colourProblem(entry.value) }))
         .filter((entry) => entry.problem),
-      darkest: Math.min(...ctx._colours.map((entry) => recordLuminance(entry.value))),
+      darkest: Math.min(...recordedColours(ctx).map(recordLuminance)),
       reaches: ctx._path.map(reachOf),
     }
   }

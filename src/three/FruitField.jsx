@@ -105,7 +105,6 @@ function Field({ flavor, phase, direction, onPushedOut }) {
      * flying past each other.
      */
     const offset = phase === 'in' ? 1 - s : -s
-    scene.group.position.x = offset * direction * FLAVOR_PUSH_DISTANCE * width
 
     // The shatter takes the whole field with it, so the cup breaks against the
     // neutral dark the backdrop is fading in rather than against fruit.
@@ -122,7 +121,12 @@ function Field({ flavor, phase, direction, onPushedOut }) {
     const alpha =
       phase === 'in' ? Math.min(1, s / 0.3) : 1 - Math.max(0, (s - 0.65) / 0.35)
 
-    scene.update(state.clock.elapsedTime, scrollProgress, alpha * shatter)
+    scene.update(
+      state.clock.elapsedTime,
+      scrollProgress,
+      alpha * shatter,
+      offset * direction * FLAVOR_PUSH_DISTANCE,
+    )
 
     if (phase === 'out' && s >= 1 && !reported.current) {
       reported.current = true
