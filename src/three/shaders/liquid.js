@@ -11,6 +11,10 @@
  * glass was a straight cylinder; on a tapered bowl the same trick moves the
  * wall sideways and pokes it through the glass.
  *
+ * The profile itself lives in src/three/liquidProfile.js, because Phase 5's ice
+ * and mint are bounded by the same numbers and two copies of a measured
+ * profile is how the glass and the drink drift apart.
+ *
  * vFrac runs 0 at the floor to 1 at the surface.
  */
 
@@ -49,6 +53,7 @@ export const liquidVertex = /* glsl */ `
 
 export const liquidFragment = /* glsl */ `
   uniform vec3 uColor;
+  uniform float uAlpha;
 
   varying vec3 vViewPos;
   varying vec3 vNormalV;
@@ -69,7 +74,10 @@ export const liquidFragment = /* glsl */ `
 
     vec3 color = base * (0.65 + 0.5 * diffuse) + lighter * fresnel * 0.12;
 
-    gl_FragColor = vec4(color, 1.0);
+    // Phase 4 wrote a hard 1.0 here. Bubbles and ice sit inside this solid, so
+    // an opaque drink hides them behind its own front face; the drink has to be
+    // see-through for the build to be visible at all.
+    gl_FragColor = vec4(color, uAlpha);
     #include <colorspace_fragment>
   }
 `

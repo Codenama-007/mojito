@@ -36,7 +36,11 @@ export const isMobile = qualityTier === QUALITY_TIER.MOBILE
  * rather than the gradient the user sees. The glass reads as glass through
  * opacity, clearcoat and the injected fresnel rim instead.
  */
-const TIERS = {
+/**
+ * Exported so scripts/verify-ingredients.mjs can assert both tiers. At runtime
+ * only `quality` below is read; nothing else should index this directly.
+ */
+export const TIERS = {
   [QUALITY_TIER.MOBILE]: {
     dpr: 1.5,
     latheSegments: 40,
@@ -45,6 +49,12 @@ const TIERS = {
     /** Real shadow-mapping is desktop only (AGENTS.md section 5). */
     contactShadows: false,
     contactShadowResolution: 128,
+    /** Phase 5 ingredients. Each is one InstancedMesh, so these are instance counts. */
+    bubbleCount: 40,
+    iceCount: 5,
+    mintCount: 8,
+    bubbleOpacity: 0.5,
+    iceOpacity: 0.46,
     glass: {
       opacity: 0.3,
       roughness: 0.09,
@@ -60,6 +70,11 @@ const TIERS = {
     environmentIntensity: 1.6,
     contactShadows: true,
     contactShadowResolution: 256,
+    bubbleCount: 80,
+    iceCount: 5,
+    mintCount: 10,
+    bubbleOpacity: 0.55,
+    iceOpacity: 0.42,
     glass: {
       opacity: 0.24,
       roughness: 0.04,

@@ -7,7 +7,7 @@
     "dev": "vite --host",
     "build": "vite build",
     "lint": "eslint .",
-    "verify": "node scripts/verify-shatter.mjs",
+    "verify": "node scripts/verify-shatter.mjs && node scripts/verify-ingredients.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

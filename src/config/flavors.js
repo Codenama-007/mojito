@@ -6,6 +6,14 @@
  * @property {string} label  Chip label, e.g. "Taste".
  * @property {string} value  Chip value, e.g. "Sharp citrus".
  *
+ * @typedef {Object} FlavorFruit
+ * @property {string} kind                Which builder in three/fruitModels.js draws it.
+ * @property {number} radius             Slice radius in glass units (the glass is 1 tall).
+ * @property {string} flesh              Cut face.
+ * @property {string} inner              Pith, segment lines or secondary flesh.
+ * @property {string} rind               Skin, rim or outer edge.
+ * @property {string} seed               Pips, seeds or core speckle.
+ *
  * @typedef {Object} Flavor
  * @property {string} id                 Stable key used by the store.
  * @property {string} name               Display name.
@@ -15,6 +23,7 @@
  * @property {number[][]} bokeh          Out-of-focus blobs: [x%, y%, sizeVmax, alpha].
  * @property {string} tagline            One short line of copy.
  * @property {FlavorProperty[]} properties  Exactly three chips.
+ * @property {FlavorFruit} fruit         The slice that floats in the glass.
  */
 
 export const flavors = [
@@ -38,6 +47,14 @@ export const flavors = [
       { label: 'Ingredients', value: 'Lime, mint, cane sugar' },
       { label: 'Calories', value: '92 kcal' },
     ],
+    fruit: {
+      kind: 'lime',
+      radius: 0.095,
+      flesh: '#CDE96B',
+      inner: '#A8CE4A',
+      rind: '#3F6B12',
+      seed: '#EAF6C8',
+    },
   },
   {
     id: 'strawberry',
@@ -59,6 +76,14 @@ export const flavors = [
       { label: 'Ingredients', value: 'Strawberry, basil, cane sugar' },
       { label: 'Calories', value: '98 kcal' },
     ],
+    fruit: {
+      kind: 'strawberry',
+      radius: 0.092,
+      flesh: '#F4647E',
+      inner: '#E04664',
+      rind: '#B81F3F',
+      seed: '#FFE9A8',
+    },
   },
   {
     id: 'apple',
@@ -80,6 +105,14 @@ export const flavors = [
       { label: 'Ingredients', value: 'Green apple, mint, lime' },
       { label: 'Calories', value: '88 kcal' },
     ],
+    fruit: {
+      kind: 'apple',
+      radius: 0.095,
+      flesh: '#F7F3E4',
+      inner: '#EDE6CE',
+      rind: '#D8453F',
+      seed: '#7A5A2E',
+    },
   },
   {
     id: 'mango',
@@ -101,8 +134,26 @@ export const flavors = [
       { label: 'Ingredients', value: 'Mango, chilli, lime' },
       { label: 'Calories', value: '104 kcal' },
     ],
+    fruit: {
+      kind: 'mango',
+      radius: 0.092,
+      flesh: '#FFB43C',
+      inner: '#F59318',
+      rind: '#C9710A',
+      seed: '#8A4E08',
+    },
   },
 ]
+
+/**
+ * Every mojito gets the same mint, so it is not per-flavor data and does not
+ * belong on the flavor objects. It lives here rather than in the 3D component
+ * so there is still one place for ingredient colours.
+ */
+export const mint = {
+  stemColor: '#2F6B2A',
+  tipColor: '#9ED85A',
+}
 
 /** @type {Flavor} */
 export const defaultFlavor = flavors[0]

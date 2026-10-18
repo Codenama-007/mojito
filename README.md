@@ -68,13 +68,16 @@ src/
     MojitoGroup.jsx      <- the glass choreography (drop, shake, sway, ease)
     Glass.jsx            <- the loaded model, plus a lathe fallback
     Liquid.jsx           <- custom shader liquid, lathe on the bowl interior
+    liquidProfile.js     <- the drink's bounds, in one place, as plain numbers
     Ground.jsx           <- contact shadow under the glass (desktop only)
     Shatter.jsx          <- 60 (40 mobile) shards, one InstancedMesh
     shardMath.js         <- pure, reversible shard maths
-    Ice.jsx              <- not built yet
-    Mint.jsx             <- not built yet
-    Fruit.jsx            <- not built yet
-    Bubbles.jsx          <- not built yet
+    Bubbles.jsx          <- 80 (40 mobile) bubbles, one InstancedMesh
+    Ice.jsx              <- 5 rounded cubes, one InstancedMesh
+    Mint.jsx             <- 8-10 leaves, one InstancedMesh, shape built in code
+    Fruit.jsx            <- one slice per flavor, cross-faded on flavor change
+    fruitModels.js       <- the four slices, built from primitives
+    ingredientMath.js    <- pure, reversible ingredient maths
     shaders/
       liquid.js          <- liquid vertex + fragment
       glassMaterial.js   <- shared glass material, optional per-instance fade
@@ -98,9 +101,11 @@ src/
 public/
   models/glass.glb       <- 236 KB
   env/studio.hdr         <- 1.4 MB, environment map
+prompts/                 <- the owner's prompts, recorded verbatim
 scripts/
   extract-glass-profile.mjs <- measures the GLB, writes config/glassProfile.js
   verify-shatter.mjs        <- reversal + sanity checks for the shard maths
+  verify-ingredients.mjs    <- bounds + reversal checks for ice/mint/fruit/fizz
 ```
 
 ## Contact details are placeholders
@@ -172,6 +177,57 @@ sample clear black instead of the gradient the user actually sees. The glass
 reads as glass through opacity, clearcoat, the environment map and a fresnel
 rim injected into the physical shader.
 
+## The ingredients
+
+Scrolling from the hero into the first flavor section builds the drink:
+bubbles fade in, ice drops in from above, mint arrives, then the fruit.
+`scrollProgress` runs 0 to `BUILD_END` (0.25) across that stretch, and each
+ingredient has its own window inside it. Nothing new is stored or triggered;
+the ingredients read the scroll value the page already had.
+
+The scroll-driven part of every ingredient is a closed-form function of that
+progress, so scrolling back up empties the glass again in exactly the reverse
+order — the same guarantee the shatter has. The clock-driven parts (the climb,
+the bob, the sway) are separate and never touch scroll.
+
+Everything is fitted against `liquidProfile.js`, which is the drink's measured
+bounds pulled out of `Liquid.jsx`. Ice, mint and bubbles all ask it how much
+room there is at their own height rather than carrying a copied constant, and
+`verify-ingredients.mjs` sweeps both tiers and asserts every instance of every
+ingredient stays inside. The fruit goes further: the verifier builds all four
+slices, walks every vertex, and checks each one against the real glass wall.
+
+| | desktop | mobile |
+|---|---|---|
+| Bubbles | 80, one `InstancedMesh` | 40, one `InstancedMesh` |
+| Ice | 5 rounded cubes, one `InstancedMesh` | same |
+| Mint | 10 leaves, one `InstancedMesh` | 8 |
+| Fruit | one slice, built from primitives | same |
+
+**The drink had to become translucent for any of this to be visible.** It was a
+closed lathe with a hard `1.0` alpha, so anything placed inside it — bubbles
+included — was hidden behind its own front face. It is now `transparent` at
+0.85, with depth writes off and front faces only, so the back wall is culled
+and you look into the drink. Its geometry, uniforms, fill level and color lerp
+are unchanged.
+
+The ingredients are parented inside the same group as the glass, the one
+`MojitoGroup.jsx` already hides when the glass breaks, so the shatter takes
+them with it and no shatter logic was touched.
+
+The ice material is the glass recipe with a different opacity — same tier
+numbers, same fresnel rim, one set of values. The mint leaf is a shape built
+from two curves, coloured by a vertex gradient rather than a texture, because
+the asset budget has about 0.3 MB left and a leaf image would have spent it.
+The fruit is a small group of primitives per flavor: fruit is the one
+ingredient that needs no instancing, since only one slice is ever on screen.
+
+Every slice's colors come from the `fruit` block on its flavor in
+`config/flavors.js`, so no color is written inside a 3D component. Mint is the
+one ingredient that is not flavor data — every mojito gets the same mint — so
+its two greens are a separate export in the same file rather than four
+identical copies on the flavor objects.
+
 ## The backdrop
 
 The flavor gradient and its bokeh blobs are both CSS. On a flavor change the
@@ -199,7 +255,12 @@ scrolling back up reassemble the glass exactly rather than leaving it
 scattered. `scripts/verify-shatter.mjs` asserts that reversal over 200 scroll
 steps, plus alpha monotonicity, finite values, unit-length rotation
 quaternions, shard origins on the real surface, and the shape of the measured
-interior profile:
+interior profile.
+
+`scripts/verify-ingredients.mjs` does the same job for the ingredients: the
+same reversal sweep, the appearance order, and a bounds check that walks every
+instance — and every vertex of every fruit slice — against the glass and the
+drink. Both run together:
 
 ```powershell
 pnpm verify
@@ -212,6 +273,6 @@ pnpm verify
 - [x] 3A. Navbar and scroll journey
 - [x] 3B. Glass shatter and contact details
 - [x] 3C. Realistic glass, environment map, contact shadow, CSS backdrop
-- [ ] 4. Scroll story: ice, mint, fruit, bubbles
+- [x] 4. Scroll story: ice, mint, fruit, bubbles (committed as "phase-5: ingredients")
 - [ ] 5. Mobile optimization pass
 - [ ] 6. Loader, SEO, deploy to Vercel

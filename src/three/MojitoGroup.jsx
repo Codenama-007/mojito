@@ -5,6 +5,10 @@ import { isMobile, prefersReducedMotion } from '../config/performance.js'
 import { useStore } from '../store/useStore.js'
 import Glass from './Glass.jsx'
 import Liquid from './Liquid.jsx'
+import Bubbles from './Bubbles.jsx'
+import Ice from './Ice.jsx'
+import Mint from './Mint.jsx'
+import Fruit from './Fruit.jsx'
 import Shatter from './Shatter.jsx'
 import { BREAK_START } from './shardMath.js'
 
@@ -96,9 +100,19 @@ export default function MojitoGroup({ baseScale }) {
     <group ref={groupRef}>
       {/* Centres the 1.0-tall glass on the group origin. */}
       <group position={[0, -0.5, 0]}>
+        {/*
+          Everything that belongs to the drink goes inside intactRef, which is
+          already hidden the moment the glass breaks. The ingredients need no
+          shatter logic of their own, and that is the whole reason they are
+          parented here rather than beside the glass.
+        */}
         <group ref={intactRef}>
           <Glass />
           <Liquid />
+          <Bubbles />
+          <Ice />
+          <Mint />
+          <Fruit />
         </group>
         <Shatter />
       </group>
