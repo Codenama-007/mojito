@@ -157,3 +157,54 @@ centre the column, leave the text left-aligned and the glass where it is.
 `margin-inline: auto` on `.facts__content` and `.faq__content`, scoped to those two
 rather than set on `.section__content`, which would drag the flavor sections off
 the sides their cup targets reserve.
+
+## 8. Follow-up in the same phase: the nav links did nothing on a phone
+
+Prompt 14: on a phone, no nav link went anywhere; could they scroll to their
+section, smoothly. The diagnosis took reading Lenis's source rather than this
+project's, because our side was already asking correctly — twice Lenis said no:
+
+```js
+if ((this.isStopped || this.isLocked) && !force) return      // scrollTo refuses
+internalStart() { this.reset(); this.isStopped = false }     // start resets...
+reset() { ... this.animate.stop() }                          // ...which cancels
+```
+
+The menu stops the instance while it is open. So on a phone — and only there,
+because that is the only place the links live inside the overlay — the click asked
+a stopped Lenis to scroll, `preventDefault` killed the browser's own jump in the
+same breath, and the `onComplete` that would have closed the menu never ran. The
+fix is `lenis.start()` before `lenis.scrollTo(href, { offset })`: starting first
+makes the scroll acceptable, and makes the close's later `start()` a no-op instead
+of a reset that stops the animation in flight.
+
+`force: true` was the first attempt and it was wrong in an instructive way. It
+passes the stopped check, so the scroll does begin — and then the close cancels it
+one frame later. It is the version of this fix that no test in the repo would have
+caught.
+
+So the repo now has one: `scripts/verify-nav.mjs` installs a stub `window`,
+`document` and `Window` (Lenis measures through `wrapper instanceof Window`), maps
+every id in `SECTION_ORDER` to a section 800px below the last, imports the project's
+own `scrollToSection`, and drives a **real** Lenis through it with
+`new Lenis({ autoRaf: false })` and ninety hands-turned `raf()` frames. It checks
+the two traps as trap 1 and trap 2 — a stopped instance scrolls nowhere, and a
+scroll started before the close is cancelled by it — then walks all nine sections
+and asserts each lands at `top + SCROLL_OFFSET`, plus the no-Lenis fallback, the
+44px tap targets, and that the overlay can scroll itself. The mutations were run to
+prove the checks bite: deleting `start()`, moving it after the scroll, dropping the
+offset, ignoring the href, and removing the fallback are each caught, and the file
+is restored byte-identically afterwards.
+
+What this suite does not do is look at the page. There is still no browser in this
+harness, so the veil's fade, the feel of the travel and the look of the menu remain
+the owner's to judge; what is asserted is the state machine and the arithmetic,
+which is where the bug was.
+
+Also fixed in the same pass, because it is the same menu on the same phones: the
+overlay could not scroll, and six 56px links do not fit a landscape screen, so its
+last link was unreachable. It now scrolls itself (`overflow-y: auto`,
+`overscroll-behavior: contain`, `data-lenis-prevent`), centred with `margin: auto`
+rather than `justify-content: center`, since centred overflow is clipped off the top
+where nothing can reach it.
+

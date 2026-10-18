@@ -121,8 +121,15 @@
   inset: 0;
   z-index: 4;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  /* Scrolls only if it has to. Six links at 56px plus the close button do not fit
+     a landscape phone, and a menu that cannot reach its own last link is worse
+     than one that scrolls. The centring is `margin: auto` on the nav rather than
+     `justify-content: center`, because centred overflow is clipped off the top
+     where nothing can scroll back to it — an auto margin collapses to zero when
+     there is no room instead. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: calc(var(--nav-h) + 24px) var(--pad) 48px;
   background: rgba(255, 255, 255, 0.16);
   backdrop-filter: blur(26px) saturate(150%);
@@ -184,6 +191,8 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  /* Centres the menu vertically, and gives up gracefully when it does not fit. */
+  margin: auto;
 }
 
 .navbar__overlay-nav a {

@@ -114,7 +114,7 @@ src/
   seo/
     staticHtml.js        <- the same copy, as plain HTML, for the build
   hooks/
-    useLenis.js          <- Lenis instance, GSAP ticker wiring
+    useLenis.js          <- Lenis instance, GSAP ticker wiring, section scrolls
     useScrollProgress.js <- every ScrollTrigger -> store write
     useAdaptiveQuality.js<- FPS sampler, lowers dpr toward 1 under 45 FPS
     useGlassBaseScale.js <- viewport-derived scale, shared by cup + shadow
@@ -136,6 +136,7 @@ scripts/
   verify-cup-fit.mjs     <- the cup fits the screen in every section
   verify-fruit-field.mjs <- shader hooks, art, framing, push and spin geometry
   verify-brand.mjs       <- brand details and flavor copy
+  verify-nav.mjs         <- nav links, tap targets, and a real Lenis driven for real
   verify-static-html.mjs <- builds, reads the page source, renders the accordion
 ```
 
@@ -303,6 +304,38 @@ and is lowered further toward 1 during play if the frame rate stays under 45.
 Rendering stops while the tab is hidden. Smooth scroll is Lenis, driven by the
 GSAP ticker so the page has a single rAF loop. Lenis honours
 `prefers-reduced-motion` by collapsing to 1:1 scroll.
+
+## The navbar, and going to a section
+
+The bar is fixed, and under 768px it gives way to a hamburger that opens a
+full-screen menu. Both sets of links are the same six, from `NAV_LINKS`, and both
+call the same handler: `preventDefault`, then `scrollToSection` in `useLenis.js`.
+
+That call has an order to it, and the order is the whole story:
+
+```js
+lenis.start()
+lenis.scrollTo(href, { offset: SCROLL_OFFSET })
+```
+
+Reversed, or with the `start()` missing, the links do nothing — and because the
+handler also calls `preventDefault`, the browser's own jump is suppressed at the
+same time, so the page simply sits there. The menu stops Lenis while it is open,
+that being how the page is held still behind the veil, and a stopped Lenis refuses
+a programmatic scroll. Starting it first also means the menu's own close, which
+starts it a second time, finds it already running and no-ops — instead of resetting
+the instance, which stops any animation already in flight.
+
+This is not hypothetical. It is how the site reached the owner's phone and came
+back as a bug report, and `scripts/verify-nav.mjs` now drives a real Lenis through
+both orderings and all nine sections. `SCROLL_OFFSET` (−64, mirrored from `--nav-h`)
+is what clears the fixed bar; if Lenis is missing altogether the same offset is
+applied by hand through `window.scrollTo`, so a link is never dead.
+
+The menu itself: Escape closes it, focus goes to the close button on open and back
+to the hamburger on close, the bar behind it is `inert` so nothing under the veil
+can be tabbed to, and every control is at least 44px. If the six links do not fit —
+a landscape phone — the overlay scrolls rather than clipping the last one.
 
 ## The cup
 
@@ -578,5 +611,7 @@ pnpm verify
 - [x] 8C. Per-flavor fruit art, the pushed handover, the cup's 360° turn
 - [x] 8D. Brand details, hero and flavor copy, the navbar overlay ("phase-8d")
 - [x] 9B. AI-crawler friendly: facts, FAQ, robots, sitemap, llms.txt, real HTML
+- [x] Fix. The menu's nav links scroll to their section
+      ("phase-9b: nav links scroll to their section")
 - [ ] 9. Mobile optimization pass
 - [ ] 10. Loader, SEO, deploy to Vercel

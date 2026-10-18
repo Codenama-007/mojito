@@ -1,11 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { brand } from '../config/brand.js'
 import { NAV_LINKS, HERO_ID } from '../config/sections.js'
-import { getLenis } from '../hooks/useLenis.js'
+import { getLenis, scrollToSection } from '../hooks/useLenis.js'
 import './Navbar.css'
-
-/** Clears the fixed navbar when a link scrolls to a section. */
-const SCROLL_OFFSET = -64
 
 export default function Navbar() {
   const [open, setOpen] = useState(false)
@@ -45,19 +42,18 @@ export default function Navbar() {
     }
   }, [open])
 
+  /**
+   * A nav link, wherever it is: the bar on a desktop, the overlay on a phone.
+   *
+   * The menu closes first and the scroll goes out immediately, in that order. The
+   * menu holds the page still while it is up, so the closing transition and the
+   * scroll overlap — the veil lifts over the first third of the travel rather than
+   * holding the screen for a second while the page moves behind it.
+   */
   const go = (event, href) => {
     event.preventDefault()
-
-    const lenis = getLenis()
-    if (lenis) {
-      lenis.scrollTo(href, {
-        offset: SCROLL_OFFSET,
-        onComplete: () => setOpen(false),
-      })
-    } else {
-      document.querySelector(href)?.scrollIntoView()
-      setOpen(false)
-    }
+    setOpen(false)
+    scrollToSection(href)
   }
 
   return (
@@ -110,6 +106,9 @@ export default function Navbar() {
         aria-modal="true"
         aria-label="Menu"
         aria-hidden={!open}
+        /* Scrolls on its own if the links do not fit, rather than being swallowed
+           by a Lenis that is deliberately stopped while this is up. */
+        data-lenis-prevent
       >
         {/*
           The hamburger sits *below* the overlay, so before this existed the menu
