@@ -67,6 +67,28 @@ button {
   color: var(--ink);
 }
 
+/* --- Static shell -------------------------------------------------------- */
+
+/*
+ * The build writes the crawlable content into #root as plain HTML, and React
+ * replaces it on mount (plugins/ai-prerender.js). It is hidden here so nobody
+ * sees it for the moment between parsing and that first commit.
+ *
+ * Hidden is safe for the purpose it exists to serve: a crawler does not apply
+ * stylesheets, so the text is fully readable in the response body. The rule
+ * lives in this stylesheet, which Vite links in the head and the browser applies
+ * before the first paint, so there is nothing to flash. It is visible to screen
+ * readers, deliberately — if the bundle never arrives, it is the only content
+ * there is.
+ */
+[data-static-shell] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
 /* --- Fixed 3D layer ------------------------------------------------------ */
 
 .scene {

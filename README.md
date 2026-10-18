@@ -57,8 +57,9 @@ src/
   App.jsx                <- page sections and hooks
   config/
     flavors.js           <- ALL flavor data lives here
-    brand.js             <- brand name and contact details (see below)
+    brand.js             <- brand name, contact details, serving facts
     sections.js          <- section order, nav links, cup targets
+    siteContent.js       <- the crawlable copy: facts, FAQ, meta, JSON-LD
     performance.js       <- quality tier, dpr cap, reduced-motion, cup lean
     cupProfile.js        <- the cup, lid and straw, as numbers
   store/
@@ -103,17 +104,25 @@ src/
     FlavorSection.jsx    <- one component, rendered per flavor
     FlavorPicker.jsx     <- four buttons, lives in the hero
     About.jsx
+    BrandFacts.jsx       <- what the brand is, and the facts per flavor
+    Faq.jsx              <- eight questions, eight direct answers
     Contact.jsx          <- phone, email, and the order button
     FlavorCards.jsx      <- not built yet
     OrderCTA.jsx         <- not built yet
     Loader.jsx           <- not built yet
+  seo/
+    staticHtml.js        <- the same copy, as plain HTML, for the build
   hooks/
     useLenis.js          <- Lenis instance, GSAP ticker wiring
     useScrollProgress.js <- every ScrollTrigger -> store write
     useAdaptiveQuality.js<- FPS sampler, lowers dpr toward 1 under 45 FPS
     useGlassBaseScale.js <- viewport-derived scale, shared by cup + shadow
   assets/                <- compressed models and textures only
+plugins/
+  ai-prerender.js        <- writes the crawlable HTML, JSON-LD and sitemap
 public/
+  robots.txt             <- allow everything, including the AI crawlers
+  llms.txt               <- the brand, the flavors, and links, for LLMs
   images/glass.jpg       <- the owner's reference shot for the cup
   env/studio.hdr         <- 1.4 MB, environment map
   backdrops/fruits/      <- OPTIONAL cutout sheets; see "The fruit field"
@@ -126,6 +135,7 @@ scripts/
   verify-cup-fit.mjs     <- the cup fits the screen in every section
   verify-fruit-field.mjs <- shader hooks, art, framing, push and spin geometry
   verify-brand.mjs       <- brand details and flavor copy
+  verify-static-html.mjs <- builds, then reads the page source without JS
 ```
 
 ## Brand details
@@ -146,14 +156,93 @@ asserts the phone number is dialable, the email well-formed, the `tel:` link is 
 bare number, no field is still `TODO_`, and that each flavor's paragraph is two
 sentences, a different two sentences, and not lorem ipsum.
 
+Three more fields arrived with Phase 9B:
+
+- `siteUrl` — **empty until the site has a domain**. It is the one line that makes
+  robots.txt, the sitemap, the canonical link and llms.txt absolute. Until it is
+  set, the build falls back to Vercel's own `VERCEL_PROJECT_PRODUCTION_URL`, and
+  failing that writes paths and says so out loud.
+- `serving.size`, `serving.shelfLife`, `serving.alcohol` — the facts that are the
+  same for every flavor. **These three were defaults supplied by the owner, not
+  measurements**, so they are worth correcting if they are wrong: everything in
+  `config/siteContent.js` is published to crawlers verbatim.
+- `serving.price` — **deliberately empty, and the reason it exists is that it is
+  empty**. An invented price is the one error this kind of page makes expensive:
+  every assistant that reads it repeats the number, and none of them can tell it
+  was made up. An empty price renders as "Call to order — <phone>" in the facts
+  list, in the FAQ and in the structured data.
+
+## AI crawlers, and the page source
+
+This is a client-rendered SPA: `pnpm build` used to emit a `dist/index.html`
+containing `<div id="root"></div>` and a script tag, and **not one word of the
+page was in it**. That is fine for a person with a browser and useless for a
+crawler that reads the response body — which is most of them, and all of the AI
+ones. A prompt asking the page a question got an empty document.
+
+Phase 9B fixes that from both ends.
+
+**The copy lives in one place.** `config/siteContent.js` holds the "What is
+Affan's Mojito?" paragraph, the six facts per flavor, the eight FAQ entries, the
+`<title>` and the description, and the two JSON-LD blocks — as plain data, no
+JSX. Three consumers read it: the React sections (`BrandFacts.jsx`, `Faq.jsx`),
+the build, and the FAQPage markup. Writing it a second time into any of them is
+how a page ends up with an answer that disagrees with its own markup, and Google
+treats FAQ markup that does not match the visible answer as a violation rather
+than a cosmetic problem.
+
+The facts are **derived, not retyped**: ingredients come from the flavor's own
+`Ingredients` chip plus the brand's base, calories from its `Calories` chip, and
+size, shelf life and alcohol from `brand.serving`. So no figure on the page can
+disagree with the same figure elsewhere on it.
+
+**The build writes it into the HTML.** `plugins/ai-prerender.js` renders the same
+strings to plain HTML (`src/seo/staticHtml.js`) and puts them inside `#root`,
+plus the JSON-LD and a canonical link in the head. `src/main.jsx` removes that
+shell before it creates the React root, so the live DOM has one copy of every
+sentence and nothing ever hydrates — no mismatch to warn about.
+
+The shell is hidden by a `[data-static-shell]` rule in `src/index.css`, and that
+is safe for the reason it works at all: **a crawler does not apply stylesheets**,
+so the text is fully readable in the response body. The rule is in the stylesheet
+Vite links in the head, so it is applied before the first paint and there is
+nothing to flash. It stays in the accessibility tree deliberately — if the bundle
+never arrives it is the only content there is. What it does *not* get is a visible
+no-JS fallback: with scripting off, a person still sees an empty page, exactly as
+before this phase. That is a separate job (AGENTS.md section 7) and an easy
+follow-up — drop the hide rule.
+
+**The files a crawler reads first.**
+
+| file | what it says |
+|---|---|
+| `public/robots.txt` | `Allow: /` for everyone, and each AI crawler named explicitly |
+| `dist/sitemap.xml` | written by the plugin, because a sitemap URL has to be absolute |
+| `public/llms.txt` | the brand, the flavors, the facts and a link per section |
+
+`llms.txt` is the one file here that is a **hand-written second copy of facts** —
+its own format wants prose, not a data table. So it is not generated; instead
+`verify-static-html.mjs` asserts it still names the brand, still carries the phone
+number and still lists all four flavors. If the phone number moves, that test
+fails rather than the file quietly going stale.
+
+**How this is checked.** `pnpm verify` now ends with
+`scripts/verify-static-html.mjs`, which runs the real production build through
+Vite's own API and then reads `dist/index.html` **as bytes, with no DOM and no
+module execution**. Asserting against a rendered DOM would pass while the page
+source stayed empty — which is the exact failure this phase exists to fix. It
+checks every fact of every flavor, all eight questions and answers, that both
+JSON-LD blocks parse, that the FAQPage markup matches the visible answers
+question for question, and the shape of robots.txt, the sitemap and llms.txt.
+
 ## Current behavior
 
-Scroll drives the journey. The glass stays pinned to the screen while seven
-sections pass: hero, four flavors, about, contact. Each flavor section moves
-the glass to one side (up and centre on mobile), rotates it slightly, and sets
-the active flavor, which lerps the liquid color over about half a second. The
-backdrop cross-fades between flavors, and so does the field of fruit in front
-of it.
+Scroll drives the journey. The glass stays pinned to the screen while nine
+sections pass: hero, four flavors, about, brand facts, FAQ, contact. Each flavor
+section moves the glass to one side (up and centre on mobile), rotates it
+slightly, and sets the active flavor, which lerps the liquid color over about half
+a second. The backdrop cross-fades between flavors, and so does the field of fruit
+in front of it.
 
 Every scroll-driven value is written to the Zustand store by GSAP ScrollTrigger
 callbacks and read inside `useFrame`, so scrolling never re-renders React. The
@@ -214,7 +303,7 @@ while the cup rocks. The group is scaled *down* if it would fill more than 62% o
 the viewport height on mobile (72% desktop). Every frame the top of the straw is
 held at least 8% of the viewport below the top edge, or below the 64 px navbar on
 mobile, whichever is lower. Both use `useThree`'s viewport, so they follow the
-screen rather than assuming one. `scripts/verify-cup-fit.mjs` sweeps seven
+screen rather than assuming one. `scripts/verify-cup-fit.mjs` sweeps nine
 sections × three widths × 35 heights × both tiers and asserts the straw never
 crosses. `MOBILE_GLASS_Y_OFFSET` (0.11) still drops the whole journey on mobile,
 and the clamp runs after it.
@@ -438,5 +527,6 @@ pnpm verify
 - [x] 8. Fruit-field background (committed as "phase-8b")
 - [x] 8C. Per-flavor fruit art, the pushed handover, the cup's 360° turn
 - [x] 8D. Brand details, hero and flavor copy, the navbar overlay ("phase-8d")
+- [x] 9B. AI-crawler friendly: facts, FAQ, robots, sitemap, llms.txt, real HTML
 - [ ] 9. Mobile optimization pass
 - [ ] 10. Loader, SEO, deploy to Vercel

@@ -1,0 +1,37 @@
+# Affan's Mojito — robots.txt
+#
+# Everything on this site is meant to be read, by people and by machines. No
+# page is disallowed, for any crawler, and there is no crawl-delay: the site is
+# a single page of static text plus one canvas.
+#
+# The Sitemap line is a path rather than an absolute URL, because the domain is
+# not fixed yet. The build rewrites that line to an absolute URL using Vercel's
+# own host, or `siteUrl` in src/config/brand.js if it is set.
+
+User-agent: *
+Allow: /
+
+# The AI crawlers, named explicitly rather than left to the wildcard, so the
+# permission is visible to anyone auditing this file.
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Googlebot
+Allow: /
+
+Sitemap: /sitemap.xml

@@ -3,6 +3,8 @@ import Navbar from './ui/Navbar.jsx'
 import Hero from './ui/Hero.jsx'
 import FlavorSection from './ui/FlavorSection.jsx'
 import About from './ui/About.jsx'
+import BrandFacts from './ui/BrandFacts.jsx'
+import Faq from './ui/Faq.jsx'
 import Contact from './ui/Contact.jsx'
 import Scene from './three/Scene.jsx'
 import { flavors, getFlavor } from './config/flavors.js'
@@ -44,6 +46,17 @@ export default function App() {
         ))}
 
         <About />
+
+        {/*
+          The two sections that exist for machines as much as for people. They sit
+          last, after the mood piece and next to the order button, because that is
+          where someone who has decided they are interested looks for the
+          specifics — and because the build writes the same two sections into
+          index.html, so it helps to have them in one place.
+        */}
+        <BrandFacts />
+        <Faq />
+
         <Contact />
       </main>
     </div>

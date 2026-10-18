@@ -1,0 +1,89 @@
+/* Wider than the default .section__content: the fact list is two columns of
+   label/value pairs and 34rem squeezed the values. */
+.facts__content {
+  max-width: 44rem;
+}
+
+.facts__title {
+  font-size: clamp(30px, 8vw, 54px);
+  font-weight: 750;
+  letter-spacing: -0.035em;
+  line-height: 1;
+  text-wrap: balance;
+}
+
+.facts__intro {
+  max-width: 40rem;
+  margin-top: 16px;
+  color: var(--ink-soft);
+  font-size: clamp(15px, 4vw, 18px);
+  line-height: 1.5;
+}
+
+.facts__grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.facts__card {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.facts__name {
+  color: var(--flavor-accent);
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.facts__list {
+  margin: 10px 0 0;
+}
+
+/* Label and value side by side, one row per fact, ruled off from the next. */
+.facts__row {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+
+.facts__row:first-child {
+  border-top: 0;
+}
+
+.facts__row dt {
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.facts__row dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@media (min-width: 768px) {
+  .facts__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 380px) {
+  .facts__row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}

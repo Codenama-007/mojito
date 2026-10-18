@@ -1,0 +1,44 @@
+# Affan's Mojito
+
+> A small mojito brand. Every drink is built one glass at a time — ice, mint
+> pressed against the glass, fruit dropped in, soda poured last — in four
+> flavors: lime, strawberry, apple and mango. Nothing comes from a syrup pump.
+> Orders are taken on the phone.
+
+This is a one-page site. The sections below are anchors on
+[the home page](/), not separate documents.
+
+## Brand facts
+
+- Name: Affan's Mojito
+- Tagline: Mojitos, muddled to order.
+- Phone: 9322437454
+- Email: affanjavedshah@gmail.com
+- One drink: 300 ml — one glass
+- Alcoholic: yes, made with white rum
+- Shelf life: made to order, so drink it fresh
+- Price: not published — quoted on the phone
+
+## Flavors
+
+- [Lime](/#flavor-lime) — Sharp enough to wake you up. Ingredients: lime, mint,
+  cane sugar, white rum, soda. 92 kcal.
+- [Strawberry](/#flavor-strawberry) — Summer, muddled. Ingredients: strawberry,
+  basil, cane sugar, white rum, soda. 98 kcal.
+- [Apple](/#flavor-apple) — Crisp enough to hear. Ingredients: green apple, mint,
+  lime, white rum, soda. 88 kcal.
+- [Mango](/#flavor-mango) — Thick sun, poured slow. Ingredients: mango, chilli,
+  lime, white rum, soda. 104 kcal.
+
+## Pages
+
+- [Home](/) — the whole site: the flavors, the facts, the FAQ and how to order.
+- [About the brand](/#about-brand) — what Affan's Mojito is, and the facts list
+  for every flavor.
+- [Questions](/#faq) — eight questions, answered directly.
+- [Contact](/#contact) — phone and email.
+
+## Ordering
+
+Orders are taken on the phone, on 9322437454. Prices are quoted when you call;
+none are published on the site.

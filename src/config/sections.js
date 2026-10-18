@@ -10,6 +10,8 @@ import { flavors } from './flavors.js'
 
 export const HERO_ID = 'hero'
 export const ABOUT_ID = 'about'
+export const FACTS_ID = 'about-brand'
+export const FAQ_ID = 'faq'
 export const CONTACT_ID = 'contact'
 
 /** Section ids for the flavor sections are `flavor-<id>` throughout. */
@@ -61,6 +63,17 @@ export const GLASS_TARGETS = {
     desktop: { x: 0, y: 0, scale: 0.62, rot: 0 },
     mobile: { x: 0, y: 0.04, scale: 0.5, rot: 0 },
   },
+  // The facts and FAQ sections are text-heavy, so the cup behaves exactly as it
+  // does in About: held small and centred behind the copy rather than moving to a
+  // side it never leaves before Contact.
+  [FACTS_ID]: {
+    desktop: { x: 0, y: 0, scale: 0.62, rot: 0 },
+    mobile: { x: 0, y: 0.04, scale: 0.5, rot: 0 },
+  },
+  [FAQ_ID]: {
+    desktop: { x: 0, y: 0, scale: 0.62, rot: 0 },
+    mobile: { x: 0, y: 0.04, scale: 0.5, rot: 0 },
+  },
   [CONTACT_ID]: {
     desktop: { x: 0, y: 0, scale: 0.62, rot: 0 },
     mobile: { x: 0, y: 0.04, scale: 0.5, rot: 0 },
@@ -72,6 +85,8 @@ export const SECTION_ORDER = [
   HERO_ID,
   ...flavors.map((flavor) => flavorSectionId(flavor.id)),
   ABOUT_ID,
+  FACTS_ID,
+  FAQ_ID,
   CONTACT_ID,
 ]
 
@@ -79,6 +94,8 @@ export const NAV_LINKS = [
   { href: `#${HERO_ID}`, label: 'Home' },
   { href: `#${flavorSectionId(flavors[0].id)}`, label: 'Flavors' },
   { href: `#${ABOUT_ID}`, label: 'About' },
+  { href: `#${FACTS_ID}`, label: 'Facts' },
+  { href: `#${FAQ_ID}`, label: 'FAQ' },
   { href: `#${CONTACT_ID}`, label: 'Contact' },
 ]
 

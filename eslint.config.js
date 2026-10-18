@@ -18,4 +18,14 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
+  {
+    // The build runs in Node, not in the browser. `plugins/ai-prerender.js` reads
+    // process.env for the deploy host and writes files into dist/, and the config
+    // file is loaded by Vite itself.
+    files: ['vite.config.js', 'plugins/**/*.js'],
+    languageOptions: {
+      globals: globals.node,
+      parserOptions: { ecmaFeatures: { jsx: true } },
+    },
+  },
 ])
