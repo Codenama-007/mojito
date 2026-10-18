@@ -195,10 +195,10 @@ function crown(ctx, radius, kind, color, accent) {
     ctx.fillStyle = color
     for (const angle of [-0.95, 0, 0.95]) {
       ctx.save()
-      ctx.translate(0, -radius * 0.86)
+      ctx.translate(0, -radius * 0.8)
       ctx.rotate(angle)
       ctx.beginPath()
-      ctx.ellipse(0, -radius * 0.18, radius * 0.14, radius * 0.28, 0, 0, TAU)
+      ctx.ellipse(0, -radius * 0.14, radius * 0.14, radius * 0.24, 0, 0, TAU)
       ctx.fill()
       ctx.restore()
     }
@@ -210,12 +210,12 @@ function crown(ctx, radius, kind, color, accent) {
     // palette and is what stops a red apple reading as a cherry.
     ctx.fillStyle = color
     ctx.beginPath()
-    ctx.ellipse(0, -radius * 1.04, radius * 0.075, radius * 0.22, 0, 0, TAU)
+    ctx.ellipse(0, -radius * 0.98, radius * 0.07, radius * 0.18, 0, 0, TAU)
     ctx.fill()
 
     ctx.fillStyle = accent ?? color
     ctx.beginPath()
-    ctx.ellipse(radius * 0.34, -radius * 1.06, radius * 0.32, radius * 0.15, -0.5, 0, TAU)
+    ctx.ellipse(radius * 0.32, -radius * 1.0, radius * 0.3, radius * 0.14, -0.5, 0, TAU)
     ctx.fill()
     return
   }
@@ -223,7 +223,7 @@ function crown(ctx, radius, kind, color, accent) {
   if (kind === 'mango') {
     ctx.fillStyle = color
     ctx.beginPath()
-    ctx.ellipse(0, -radius * 1.0, radius * 0.07, radius * 0.18, 0, 0, TAU)
+    ctx.ellipse(0, -radius * 0.96, radius * 0.07, radius * 0.16, 0, 0, TAU)
     ctx.fill()
     return
   }
@@ -244,9 +244,13 @@ function crown(ctx, radius, kind, color, accent) {
  */
 export function drawWhole(ctx, fruit, size = ART_SIZE) {
   const { skin, skinAlt, detail } = fruit.whole
-  // 0.4 rather than 0.42: the widest bezier reaches 1.16 x radius, and the rim
-  // stroke adds half its width outside that. 0.42 clipped the strawberry.
-  const radius = size * 0.4
+  // 0.385, and the crowns below trimmed to match. Everything on top of the fruit
+  // — a stalk, a leaf, a strawberry's calyx — is drawn *above* the silhouette, so
+  // the budget is the widest of those, not the fruit: at 0.4 the strawberry's
+  // calyx and the apple's stalk were drawn past the edge of the texture and
+  // clipped flat. `scripts/verify-fruit-field.mjs` measures every drawn path
+  // plus half the rim's stroke against the canvas, so this number stays honest.
+  const radius = size * 0.385
 
   ctx.save()
   ctx.translate(size / 2, size / 2)

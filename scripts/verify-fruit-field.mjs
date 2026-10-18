@@ -147,39 +147,49 @@ check(
 function recordingContext() {
   const colours = []
   const path = []
+  const strokes = []
 
   const noteColour = (slot, value) => colours.push({ slot, value })
 
-  const points = {
-    moveTo: (args) => [{ x: args[0], y: args[1], r: 0 }],
-    lineTo: (args) => [{ x: args[0], y: args[1], r: 0 }],
-    bezierCurveTo: (args) => [
-      { x: args[0], y: args[1], r: 0 },
-      { x: args[2], y: args[3], r: 0 },
-      { x: args[4], y: args[5], r: 0 },
-    ],
-    // arc(x, y, radius, ...) and ellipse(x, y, rx, ry, ...): a curve reaches its
-    // centre plus its radius, so both are recorded that way.
-    arc: (args) => [{ x: args[0], y: args[1], r: args[2] ?? 0 }],
-    ellipse: (args) => [{ x: args[0], y: args[1], r: Math.max(args[2] ?? 0, args[3] ?? 0) }],
-  }
+  /**
+   * The drawing moves its origin before each part — a crown is drawn above the
+   * fruit — so a recorded point only means anything alongside the offset that was
+   * in force when it was drawn. `save`/`restore` are a real stack for the same
+   * reason. Without this, the strawberry's calyx, which is drawn 0.86 of a radius
+   * up from the centre, was measured as though it sat at the centre and the one
+   * part that actually overflows its canvas looked like it fitted.
+   */
+  let origin = { x: 0, y: 0 }
+  const stack = []
+
+  const note = (name, args) => path.push({ name, args, origin: { ...origin } })
 
   const ctx = {
     _colours: colours,
     _path: path,
+    _strokes: strokes,
     globalAlpha: 1,
     lineWidth: 1,
     lineJoin: 'miter',
     shadowColor: 'rgba(0, 0, 0, 0)',
     shadowBlur: 0,
-    save() {},
-    restore() {},
-    translate() {},
+    save() {
+      stack.push({ ...origin })
+    },
+    restore() {
+      origin = stack.pop() ?? { x: 0, y: 0 }
+    },
+    translate(x = 0, y = 0) {
+      origin.x += x
+      origin.y += y
+    },
     rotate() {},
     beginPath() {},
     closePath() {},
     fill() {},
-    stroke() {},
+    stroke() {
+      strokes.push(ctx.lineWidth)
+    },
     // A gradient is a legitimate `fillStyle`, so it is marked as one and its
     // stops are recorded as colours in their own right — which is where the
     // interesting colours actually are.
@@ -207,38 +217,50 @@ function recordingContext() {
     })
   }
 
-  for (const [name, expand] of Object.entries(points)) {
-    ctx[name] = (...args) => {
-      path.push({ name, args })
-      return expand(args)
-    }
+  for (const name of ['moveTo', 'lineTo', 'bezierCurveTo', 'arc', 'ellipse']) {
+    ctx[name] = (...args) => note(name, args)
   }
 
   return ctx
 }
 
-/** Where a recorded call reaches, as a distance from the drawing's own origin. */
-function reachOf(entry) {
-  const points =
-    entry.name === 'moveTo' || entry.name === 'lineTo'
-      ? [{ x: entry.args[0], y: entry.args[1], r: 0 }]
-      : entry.name === 'bezierCurveTo'
-        ? [
-            { x: entry.args[0], y: entry.args[1], r: 0 },
-            { x: entry.args[2], y: entry.args[3], r: 0 },
-            { x: entry.args[4], y: entry.args[5], r: 0 },
-          ]
-        : [
-            {
-              x: entry.args[0],
-              y: entry.args[1],
-              r: entry.name === 'arc' ? entry.args[2] : Math.max(entry.args[2], entry.args[3]),
-            },
-          ]
+/**
+ * Where a recorded call reaches, in the canvas's own coordinates.
+ *
+ * A bounding box, not a distance from the origin. Two earlier versions of this
+ * were wrong in ways that mattered:
+ *
+ *  - measuring the diagonal distance of a bezier's *control point* read an
+ *    apple's widest control point as 68 px from the centre when nothing is drawn
+ *    further than 59 px along either axis;
+ *  - measuring an `ellipse` by its larger radius made a wide flat leaf look as
+ *    tall as it is wide — that is what made the apple look like it overflowed.
+ *
+ * In canvas coordinates, so the answer is directly comparable with the canvas
+ * size and needs no assumption that the drawing was centred.
+ */
+function extentsOf(entry) {
+  const { origin } = entry
+  const at = (x, y) => ({ x: origin.x + x, y: origin.y + y })
 
-  return Math.max(
-    ...points.map((point) => Math.hypot(point.x, point.y) + point.r),
-  )
+  if (entry.name === 'moveTo' || entry.name === 'lineTo') {
+    return [at(entry.args[0], entry.args[1])]
+  }
+  if (entry.name === 'bezierCurveTo') {
+    return [
+      at(entry.args[0], entry.args[1]),
+      at(entry.args[2], entry.args[3]),
+      at(entry.args[4], entry.args[5]),
+    ]
+  }
+  // arc(x, y, r, ...) and ellipse(x, y, rx, ry, ...): the box the curve reaches.
+  const rectangle = entry.name === 'arc'
+  const [x, y, rx] = entry.args
+  const ry = rectangle ? rx : entry.args[3]
+  return [
+    { x: origin.x + x - rx, y: origin.y + y - ry },
+    { x: origin.x + x + rx, y: origin.y + y + ry },
+  ]
 }
 
 /** A colour is usable if a canvas would not silently ignore it. */
@@ -313,7 +335,8 @@ for (const flavor of flavors) {
         .map((entry) => ({ ...entry, problem: colourProblem(entry.value) }))
         .filter((entry) => entry.problem),
       darkest: Math.min(...recordedColours(ctx).map(recordLuminance)),
-      reaches: ctx._path.map(reachOf),
+      extents: ctx._path.map(extentsOf).flat(),
+      strokes: ctx._strokes,
     }
   }
 
@@ -341,15 +364,30 @@ for (const flavor of flavors) {
     `darkest ${art[`${flavor.id}.whole`].darkest.toFixed(3)} against a base of ${base.toFixed(3)}`,
   )
 
+  const points = [
+    ...art[`${flavor.id}.whole`].extents,
+    ...art[`${flavor.id}.slice`].extents,
+  ]
+
+  /**
+   * A stroke is centred on the path, so half the rim's width lands *outside* the
+   * outline. Counting it is the difference between a fruit that fits and one
+   * whose skin is shaved flat along the edge of its own texture.
+   */
+  const strokeHalf =
+    Math.max(
+      0,
+      ...art[`${flavor.id}.whole`].strokes,
+      ...art[`${flavor.id}.slice`].strokes,
+    ) / 2
+
+  const low = Math.min(...points.map((point) => Math.min(point.x, point.y))) - strokeHalf
+  const high = Math.max(...points.map((point) => Math.max(point.x, point.y))) + strokeHalf
+
   check(
     `${flavor.id}: both the whole fruit and the slice fit their canvas`,
-    [...art[`${flavor.id}.whole`].reaches, ...art[`${flavor.id}.slice`].reaches].every(
-      (reach) => reach <= ART_SIZE / 2 - 1,
-    ),
-    `widest reach ${Math.max(
-      ...art[`${flavor.id}.whole`].reaches,
-      ...art[`${flavor.id}.slice`].reaches,
-    ).toFixed(1)} of ${ART_SIZE / 2}`,
+    low >= -0.5 && high <= ART_SIZE + 0.5,
+    `drawn from ${low.toFixed(1)} to ${high.toFixed(1)} px, inside 0 to ${ART_SIZE}`,
   )
 }
 
