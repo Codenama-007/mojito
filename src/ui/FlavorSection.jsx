@@ -22,6 +22,7 @@ export default function FlavorSection({ flavor, index }) {
         <p className="flavor__index">{String(index).padStart(2, '0')}</p>
         <h2 className="flavor__name">{flavor.name}</h2>
         <p className="flavor__tagline">{flavor.tagline}</p>
+        <p className="flavor__story">{flavor.story}</p>
 
         <ul className="flavor__chips">
           {flavor.properties.map((property) => (

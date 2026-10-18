@@ -111,7 +111,11 @@
   transform: translateY(-6px) rotate(-45deg);
 }
 
-/* Full-screen overlay. visibility:hidden keeps it out of the tab order. */
+/* Full-screen overlay. visibility:hidden keeps it out of the tab order.
+   A veil, not a panel: the canvas keeps showing through, blurred, so the fruit
+   field stays visible behind the menu. The ink is near-black and all four flavor
+   base colours are bright, so the links keep their contrast without an opaque
+   sheet — the 0.9 white that used to be here read as a blank white screen. */
 .navbar__overlay {
   position: fixed;
   inset: 0;
@@ -120,9 +124,9 @@
   align-items: center;
   justify-content: center;
   padding: calc(var(--nav-h) + 24px) var(--pad) 48px;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(26px) saturate(150%);
+  -webkit-backdrop-filter: blur(26px) saturate(150%);
   opacity: 0;
   visibility: hidden;
   transition:
@@ -130,9 +134,49 @@
     visibility 280ms;
 }
 
+/* Without a blur to lean on, a 16% veil is a legibility gamble. Fall back to a
+   near-opaque sheet, which is what a browser without backdrop-filter gets. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .navbar__overlay {
+    background: rgba(244, 250, 236, 0.94);
+  }
+}
+
 .navbar__overlay.is-open {
   opacity: 1;
   visibility: visible;
+}
+
+/* Sits where the hamburger is, above the navbar in the stack (the overlay is
+   z-index 4, the bar z-index 3), so it is always there to tap. */
+.navbar__close {
+  position: absolute;
+  top: 0;
+  right: var(--pad);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: var(--nav-h);
+  margin-right: -8px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.navbar__close:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navbar__icon span {
+    transition: none;
+  }
 }
 
 .navbar__overlay-nav {

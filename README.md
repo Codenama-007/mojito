@@ -57,7 +57,7 @@ src/
   App.jsx                <- page sections and hooks
   config/
     flavors.js           <- ALL flavor data lives here
-    brand.js             <- contact details (PLACEHOLDERS, see below)
+    brand.js             <- brand name and contact details (see below)
     sections.js          <- section order, nav links, cup targets
     performance.js       <- quality tier, dpr cap, reduced-motion, cup lean
     cupProfile.js        <- the cup, lid and straw, as numbers
@@ -87,22 +87,23 @@ src/
     Splash.jsx           <- the juice burst that leaves the lid
     splashMath.js        <- pure, closed-form ballistic maths
     ingredientMath.js    <- pure, reversible ingredient maths
-    FruitField.jsx       <- the background fruit, cross-faded
+    FruitField.jsx       <- the background fruit: the push, and the swap state
     fruitFieldScene.js   <- two InstancedMeshes and the per-frame walk
     fruitFieldMath.js    <- pure layer, layout and drift maths
     fruitFieldMaterial.js<- one material, two shader injections
     fruitTextures.js     <- whole fruit and slice, drawn to a canvas
+    fruitArt.js          <- the four silhouettes, rims and halos (pure canvas 2D)
     shaders/
       liquid.js          <- liquid vertex + fragment
       plasticMaterial.js <- the one plastic recipe: cup, lid and shards
   ui/
-    Backdrop.jsx         <- solid flavor base + readability layers, cross-faded
+    Backdrop.jsx         <- solid flavor base + readability layers, pushed
     Navbar.jsx           <- fixed bar, hamburger overlay under 768px
     Hero.jsx             <- headline + flavor picker
     FlavorSection.jsx    <- one component, rendered per flavor
     FlavorPicker.jsx     <- four buttons, lives in the hero
     About.jsx
-    Contact.jsx          <- placeholder for now
+    Contact.jsx          <- phone, email, and the order button
     FlavorCards.jsx      <- not built yet
     OrderCTA.jsx         <- not built yet
     Loader.jsx           <- not built yet
@@ -123,15 +124,27 @@ scripts/
   verify-whole-fruits.mjs<- orbit, clearance and cross-fade checks
   verify-splash.mjs      <- ballistics, fade and colour checks
   verify-cup-fit.mjs     <- the cup fits the screen in every section
-  verify-fruit-field.mjs <- shader hooks, framing, and backdrop contrast
+  verify-fruit-field.mjs <- shader hooks, art, framing, push and spin geometry
+  verify-brand.mjs       <- brand details and flavor copy
 ```
 
-## Contact details are placeholders
+## Brand details
 
-`src/config/brand.js` holds the brand name, phone, email, address, Instagram
-and order URL. Every value is currently a `TODO_` placeholder, and the contact
-section shows an on-screen warning while any remain, so a placeholder cannot
-ship unnoticed. Replace the values before launch.
+`src/config/brand.js` holds the name ("Affan's Mojito"), the phone number and the
+email. It is the only place they are written down.
+
+Two fields are **deliberately empty**: `instagram` and `address`, because neither
+was supplied. An empty string means "we do not have this", and the contact section
+drops the row rather than rendering a blank or a dead link — so there is no second
+flag to keep in step with the data. Fill either one in and the row appears with no
+other change.
+
+"Order now" dials, because orders are taken on the phone.
+
+`scripts/verify-brand.mjs` is what stops a placeholder reaching a live page: it
+asserts the phone number is dialable, the email well-formed, the `tel:` link is a
+bare number, no field is still `TODO_`, and that each flavor's paragraph is two
+sentences, a different two sentences, and not lorem ipsum.
 
 ## Current behavior
 
@@ -303,6 +316,21 @@ clock, and the field is dealt out to 145% of the frame so that parallax never
 uncovers an empty edge. A clear zone in the middle keeps fruit from sitting over
 the cup.
 
+**Each flavor has to read as its own fruit.** Every base colour is a shade of that
+flavor's own hue, so colour alone can never separate the fruit from its backdrop —
+a mango on orange and an apple on green both came out looking like an empty
+background. The fix is three things at once, and `fruitArt.js` is where they live:
+a distinct **silhouette** per kind (a squashed disc for the lime, a dipped
+two-lobed apple, a narrow-topped mango, a wedge for the strawberry), a dark **rim**
+drawn at −58% brightness around every outline, and a soft dark **halo** behind the
+whole fruit. `verify-fruit-field.mjs` drives the art with a stub 2D context that
+records every path and colour, so it can assert the hard part as a number: each
+flavor's darkest drawn colour is at least 0.2 luminance below its own backdrop, and
+the four whole fruits and the four slices draw four different silhouettes each. It
+also measures every drawn path plus half the rim's stroke against the 128 px canvas,
+which is how the strawberry's calyx and the apple's stalk were caught being clipped
+by the edge of their own texture.
+
 Nothing in the field is lit, and no fruit writes depth, so none of it can pick up
 a highlight from the scene lights or cut a seam into the cup.
 
@@ -316,14 +344,40 @@ runs the injection against a stand-in shader to check what came out. That is the
 one failure mode here that no build would catch: a three upgrade that renames
 `#include <map_fragment>` produces a field of hard-edged squares, not an error.
 
-**The swap.** A flavor change does not cut. The outgoing flavor's field stays
-mounted, fades out and shrinks to 65% while the incoming one fades in from 82%
-over 0.8 s, and the base colour cross-fades under them: the outgoing opaque fill
-is painted *over* the incoming one and animates away, which is the only
-arrangement where a fade is visible at all — put it underneath and the incoming
-fill hides it instantly, which is what Phase 3A was doing. Both fields deal their
-fruit out from the same seed, so the fruit does not move — it changes colour in
-place. The extra field costs one draw call for 0.8 s.
+**The handover is a push, not a cut (Phase 8C).** A flavor change carries the
+outgoing field one full viewport to one side while the incoming one arrives from
+the other side behind it, `FLAVOR_PUSH_DISTANCE` of `FLAVOR_PUSH` (0.8 s). The CSS
+base colour does exactly the same thing with the same numbers, so the fruit
+travels with the colour it is painted on — which is the whole point, and why
+`FruitField`'s frame loop and `Backdrop.css`'s keyframes are both deliberately
+**linear**. Any easing would have to be written twice, and two curves meant to
+match and slightly failing is worse than an even wipe.
+
+The two pushed layers are always exactly one viewport apart, so their union
+always covers the screen. The field is 145% of a frame wide, though, so at the end
+of a push a sliver of the outgoing fruit is still on screen; it is invisible only
+because the outgoing alpha reaches zero over the last third of the travel. That
+fade is load-bearing, not decoration.
+
+A flavor change arriving mid-push is handled on the field itself. Each field is
+keyed by the *swap*, not by the flavor, so strawberry → lime → strawberry builds a
+new field rather than reviving one whose clock and direction belong to a change
+that is over. When a field in flight is demoted to outgoing, its clock is moved
+back exactly one viewport's worth of progress: it continues the conveyor it was
+already on instead of jumping back to the start. One rule covers both cases, and
+there is one outgoing slot — a third flavor arriving mid-push discards the oldest
+outgoing, which is a fruit-position jump rather than a hole, since the base colour
+is always behind.
+
+**The cup turns a full turn (Phase 8C).** Every flavor change — a tap on the picker
+or a scroll into a flavor section, both of which land in `activeFlavor` — spins the
+cup exactly 360° over `FLAVOR_SPIN` (1.35 s), direction taken from
+`flavorDirectionFor` so stepping back through the flavors undoes the turn. It is
+added to the section yaw rather than replacing it, and a whole turn is the
+identity, so nothing has to be reset and no end state reconciled. The ease is
+cubic **in and out**: a glass is nearly a solid of revolution, and a front-loaded
+ease put most of the turn into its first third, where on a shape this symmetric it
+read as a snap rather than a revolution.
 
 **The shatter takes it with it.** Once `breakProgress` passes 0.3 the field has
 faded to nothing, and the backdrop fades to a neutral dark behind it, so the cup
@@ -362,8 +416,9 @@ cone.
 `scripts/verify-ingredients.mjs` does the same job for the ingredients: the
 same reversal sweep, the appearance order, and a bounds check that walks every
 instance — and every vertex of every fruit slice and every leaf — against the
-plastic and the drink. The other four suites cover the whole fruit, the splash,
-the Phase 8A fit and the Phase 8B field. They all run together:
+plastic and the drink. The other suites cover the whole fruit, the splash,
+the Phase 8A fit, the Phase 8B field and the Phase 8C art and transitions. They
+all run together:
 
 ```powershell
 pnpm verify
@@ -381,5 +436,7 @@ pnpm verify
 - [x] 6. Takeaway cup, packed mint, wall bubbles (committed as "phase-7: takeaway cup")
 - [x] 7. Tilt right, and keep the straw on screen (committed as "phase-8a")
 - [x] 8. Fruit-field background (committed as "phase-8b")
+- [x] 8C. Per-flavor fruit art, the pushed handover, the cup's 360° turn
+- [x] 8D. Brand details, hero and flavor copy, the navbar overlay ("phase-8d")
 - [ ] 9. Mobile optimization pass
 - [ ] 10. Loader, SEO, deploy to Vercel

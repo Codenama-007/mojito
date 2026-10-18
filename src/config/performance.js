@@ -144,7 +144,7 @@ export const FLAVOR_PUSH = 0.8
 export const FLAVOR_PUSH_DISTANCE = 1
 
 /** Seconds for the cup's one full turn on a flavor change. */
-export const FLAVOR_SPIN = 0.9
+export const FLAVOR_SPIN = 1.35
 
 /**
  * How far the page darkens for the shatter, and towards what.

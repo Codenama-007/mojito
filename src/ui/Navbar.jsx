@@ -10,6 +10,7 @@ const SCROLL_OFFSET = -64
 export default function Navbar() {
   const [open, setOpen] = useState(false)
   const toggleRef = useRef(null)
+  const closeRef = useRef(null)
   const wasOpen = useRef(false)
 
   // Lock the page while the overlay is up, and close it on Escape.
@@ -30,12 +31,11 @@ export default function Navbar() {
     }
   }, [open])
 
-  // Focus the first overlay link on open, return focus to the toggle on close.
+  // Focus the close button on open, return focus to the toggle on close.
   useEffect(() => {
     if (open) {
       wasOpen.current = true
-      const first = document.querySelector('.navbar__overlay a')
-      first?.focus()
+      closeRef.current?.focus()
       return
     }
 
@@ -62,7 +62,12 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="navbar">
+      {/*
+        `inert` while the overlay is up: the bar is behind the veil, so its logo
+        and its toggle would otherwise still be reachable by Tab as invisible
+        controls. React 19 takes a boolean here.
+      */}
+      <nav className="navbar" inert={open}>
         <a
           className="navbar__logo"
           href={`#${HERO_ID}`}
@@ -101,7 +106,31 @@ export default function Navbar() {
       <div
         id="navbar-overlay"
         className={`navbar__overlay${open ? ' is-open' : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menu"
+        aria-hidden={!open}
       >
+        {/*
+          The hamburger sits *below* the overlay, so before this existed the menu
+          opened over the only control that could close it. This button occupies
+          the same 44 px corner, so the hamburger appears to turn into an X in
+          place rather than the menu swallowing it.
+        */}
+        <button
+          ref={closeRef}
+          type="button"
+          className="navbar__close"
+          aria-label="Close menu"
+          onClick={() => setOpen(false)}
+        >
+          <span className="navbar__icon" data-open="true" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
+        </button>
+
         <nav className="navbar__overlay-nav" aria-label="Sections">
           {NAV_LINKS.map((link) => (
             <a

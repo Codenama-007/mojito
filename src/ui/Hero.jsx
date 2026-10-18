@@ -8,9 +8,13 @@ export default function Hero() {
     <section id={HERO_ID} className="section hero">
       <div className="hero__content">
         <p className="hero__eyebrow">{brand.tagline}</p>
-        <h1 className="hero__title">Pour it with your thumb.</h1>
+        <h1 className="hero__title">{brand.name}</h1>
         <p className="hero__lede">
-          Four flavors, one glass. Scroll down and watch it build.
+          Four mojitos built in one glass. Scroll and it fills in front of you:
+          ice drops in, the mint gets muddled, the fruit lands, the fizz climbs.
+        </p>
+        <p className="hero__hint">
+          Tap a flavor to pour it, or scroll to build it a step at a time.
         </p>
       </div>
 

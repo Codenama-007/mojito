@@ -37,6 +37,17 @@
   line-height: 1.4;
 }
 
+/* Says what the page does, which is not obvious from a scroll-driven hero and
+   costs nothing to state. */
+.hero__hint {
+  max-width: 24rem;
+  margin-top: 12px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
 .hero__controls {
   display: flex;
   justify-content: flex-start;

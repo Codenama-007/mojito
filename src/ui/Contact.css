@@ -78,15 +78,3 @@
 .contact__order:active {
   transform: scale(0.97);
 }
-
-.contact__warning {
-  margin-top: 16px;
-  color: #8a3b00;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.contact__warning code {
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 12px;
-}

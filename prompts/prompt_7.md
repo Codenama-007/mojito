@@ -26,3 +26,18 @@ Three asks:
 Two things in that are ambiguous and were put to the owner before any code was
 written: what the fruit field actually looks like per section, and which of
 several transitions "old goes in / new comes out" means.
+
+## Answers, recorded before the code was written
+
+- **The rotation** is a **full 360 degrees**, not a partial lean.
+- **The transition** is a **directional wipe**: the old background leaves one side
+  and the new one arrives from the other, moving in opposite directions. Not a
+  cross-fade.
+
+## What the first ask turned out to mean
+
+Not "the per-flavor swap is broken". See `prompt_8.md`: the fruit field never
+rendered on any flavor in development, and what was on screen at the lime section
+was the solid base colour — so the assumption here that lime's field worked is what
+pointed the search at the swap instead of at whether the field drew anything.
+

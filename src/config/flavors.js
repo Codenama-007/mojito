@@ -38,6 +38,8 @@
  *                                       field is what gives the background its depth now,
  *                                       and a gradient behind it only muddied the fruit.
  * @property {string} tagline            One short line of copy.
+ * @property {string} story              Two sentences on what the drink is and how it
+ *                                       drinks. The flavor section's paragraph.
  * @property {FlavorProperty[]} properties  Exactly three chips.
  * @property {FlavorFruit} fruit         The slice that floats in the glass.
  */
@@ -52,6 +54,8 @@ export const flavors = [
     strawColor: '#3E8E1E',
     colorA: '#B6E23C',
     tagline: 'Sharp enough to wake you up.',
+    story:
+      'Pressed lime and mint, muddled just long enough to smell green. The cane syrup is a short measure, so this one stays sharp to the bottom of the glass.',
     properties: [
       { label: 'Taste', value: 'Sharp citrus' },
       { label: 'Ingredients', value: 'Lime, mint, cane sugar' },
@@ -81,6 +85,8 @@ export const flavors = [
     strawColor: '#E0244A',
     colorA: '#FF8AA6',
     tagline: 'Summer, muddled.',
+    story:
+      'Ripe berries muddled to a pulp, seeds and all, then lifted with basil. It lands sweet and finishes tart.',
     properties: [
       { label: 'Taste', value: 'Soft and sweet' },
       { label: 'Ingredients', value: 'Strawberry, basil, cane sugar' },
@@ -109,6 +115,8 @@ export const flavors = [
     strawColor: '#2F9E44',
     colorA: '#93D97F',
     tagline: 'Crisp enough to hear.',
+    story:
+      'Green apple, sliced thin with the skin left on, so the drink keeps its bite. Lime and mint pull the sweetness back.',
     properties: [
       { label: 'Taste', value: 'Dry, green crunch' },
       { label: 'Ingredients', value: 'Green apple, mint, lime' },
@@ -137,6 +145,8 @@ export const flavors = [
     strawColor: '#F08C0B',
     colorA: '#FFC24F',
     tagline: 'Thick sun, poured slow.',
+    story:
+      'Ripe mango pulp, one hard squeeze of lime, and a pinch of chilli to cut through the sugar. Thick enough that the straw stands up in it.',
     properties: [
       { label: 'Taste', value: 'Thick and tropical' },
       { label: 'Ingredients', value: 'Mango, chilli, lime' },

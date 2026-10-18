@@ -23,6 +23,16 @@
   text-wrap: balance;
 }
 
+/* The second sentence of the pitch. Softer and narrower than the tagline, so the
+   section still reads top-down: number, name, hook, detail. */
+.flavor__story {
+  max-width: 27rem;
+  margin-top: 12px;
+  color: var(--ink-soft);
+  font-size: clamp(14px, 3.8vw, 17px);
+  line-height: 1.5;
+}
+
 .flavor__chips {
   display: flex;
   flex-wrap: wrap;
@@ -68,7 +78,8 @@
     justify-content: flex-end;
   }
 
-  .flavor__content.is-right .flavor__tagline {
+  .flavor__content.is-right .flavor__tagline,
+  .flavor__content.is-right .flavor__story {
     margin-left: auto;
   }
 }

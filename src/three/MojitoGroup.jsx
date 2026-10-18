@@ -40,11 +40,19 @@ const TILT_X = toRadians(CUP_TILT_X)
 const SWAY = toRadians(CUP_SWAY)
 
 /**
- * The cup's welcome for a new flavor, eased so it arrives rather than stops.
- * Cubic out: quick off the mark, gentle into the finish, and — the property
- * that matters — exactly 0 at 0 and exactly 1 at 1.
+ * The cup's welcome for a new flavor.
+ *
+ * Cubic **in and out**, not out. The turn is a full revolution, and a glass is
+ * very nearly a solid of revolution: a front-loaded ease put seven eighths of the
+ * turn into the first third of the duration, which on a shape this symmetric
+ * reads as the cup snapping rather than revolving. Even at both ends, fast in the
+ * middle, is what makes a whole turn legible.
+ *
+ * Exactly 0 at 0 and exactly 1 at 1, which is what lets the spin be added to the
+ * section yaw and be forgotten: one whole turn is the identity.
  */
-const easeOutCubic = (t) => 1 - (1 - t) ** 3
+const easeInOutCubic = (t) =>
+  t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2
 
 /**
  * The one cup, choreographed. Everything the scroll does to it happens here and
@@ -264,7 +272,7 @@ export default function MojitoGroup({ baseScale }) {
     }
 
     const spinAngle =
-      easeOutCubic(spin.current.t) * Math.PI * 2 * spin.current.direction
+      easeInOutCubic(spin.current.t) * Math.PI * 2 * spin.current.direction
 
     group.position.x = current.x + shakeX
     group.position.y = y
