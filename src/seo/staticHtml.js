@@ -22,6 +22,12 @@ import {
  * It is written into `#root` by `plugins/ai-prerender.js`. React replaces it on
  * mount, which is the standard static-shell arrangement: no hydration, so no
  * mismatch, and the copy a person reads is the copy the crawler read.
+ *
+ * One asymmetry is deliberate. The FAQ renders on the page as an accordion, and
+ * *every* answer here is written out flat, with no disclosure buttons — because
+ * there is no script in this document to disclose anything with. Eight dead
+ * buttons would be a worse answer than a plain list, and a panel that is open
+ * here but closed after React mounts is still indexed either way.
  */
 
 /** Only the three characters that can change meaning inside text content. */

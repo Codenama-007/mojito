@@ -1,30 +1,34 @@
 import { FAQ_ID } from '../config/sections.js'
 import { faq } from '../config/siteContent.js'
+import Accordion from './Accordion.jsx'
 import './Faq.css'
 
 /**
- * The FAQ, as real HTML rather than an accordion.
+ * The FAQ: eight questions and eight direct answers, disclosed one panel at a
+ * time.
  *
- * A `<details>` element per question would be tidier and would still be in the
- * page source, but it would also put eight tap targets in the way of the answers,
- * and AGENTS.md is explicit that scroll drives everything and no tap is required.
- * A definition list needs no JavaScript, reads in order, and is the shape the
- * `FAQPage` markup mirrors.
+ * This was a definition list until the owner asked for an accordion. The reason it
+ * matters that it is a *disclosure* and not a `<details>` element or a
+ * click-to-reveal is in Accordion.jsx: collapsed is the `hidden` attribute, so
+ * every answer is still in the page source whether or not anyone opens it. A
+ * crawler reads all eight; a thumb opens one.
+ *
+ * Ids are derived from the position rather than random, so they are stable across
+ * renders and legible in the page source: `faq-1-heading`, `faq-1-body`, and so on.
  */
 export default function Faq() {
+  const items = faq().map((entry, index) => ({
+    id: `faq-${index + 1}`,
+    question: entry.question,
+    answer: entry.answer,
+  }))
+
   return (
     <section id={FAQ_ID} className="section section--bottom faq">
       <div className="section__content faq__content">
         <h2 className="faq__title">Questions</h2>
 
-        <dl className="faq__list">
-          {faq().map((entry) => (
-            <div key={entry.question} className="faq__row">
-              <dt className="faq__question">{entry.question}</dt>
-              <dd className="faq__answer">{entry.answer}</dd>
-            </div>
-          ))}
-        </dl>
+        <Accordion id="faq-accordion" items={items} />
       </div>
     </section>
   )

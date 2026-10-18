@@ -105,7 +105,8 @@ src/
     FlavorPicker.jsx     <- four buttons, lives in the hero
     About.jsx
     BrandFacts.jsx       <- what the brand is, and the facts per flavor
-    Faq.jsx              <- eight questions, eight direct answers
+    Accordion.jsx        <- Flowbite's disclosure list, in vanilla CSS
+    Faq.jsx              <- eight questions, feeding the accordion
     Contact.jsx          <- phone, email, and the order button
     FlavorCards.jsx      <- not built yet
     OrderCTA.jsx         <- not built yet
@@ -135,7 +136,7 @@ scripts/
   verify-cup-fit.mjs     <- the cup fits the screen in every section
   verify-fruit-field.mjs <- shader hooks, art, framing, push and spin geometry
   verify-brand.mjs       <- brand details and flavor copy
-  verify-static-html.mjs <- builds, then reads the page source without JS
+  verify-static-html.mjs <- builds, reads the page source, renders the accordion
 ```
 
 ## Brand details
@@ -234,6 +235,55 @@ source stayed empty — which is the exact failure this phase exists to fix. It
 checks every fact of every flavor, all eight questions and answers, that both
 JSON-LD blocks parse, that the FAQPage markup matches the visible answers
 question for question, and the shape of robots.txt, the sitemap and llms.txt.
+
+## The FAQ accordion
+
+The owner asked for the FAQ to be a disclosure list, and supplied Flowbite's
+accordion markup as the reference. It is that component: the same
+`data-accordion="collapse"` container, the same heading around a `<button>`, the
+same `data-accordion-target`/`aria-controls` pair, the same chevron carrying
+`data-accordion-icon`. What changed is the styling (Tailwind's utility classes
+become `.accordion__*` rules, the project's styling deviation) and who owns the
+state: Flowbite reads those data attributes from a script, here React owns it, so
+`aria-expanded` and `hidden` are the truth and the data attributes are markers.
+
+Four deliberate differences from the reference:
+
+- **The heading is an `<h3>`, not an `<h2>`.** Flowbite's markup is standalone, so
+  an `<h2>` is right there. Here the section's own `<h2>` titles the group, and
+  eight more would tell a screen reader that the questions and their heading are
+  siblings.
+- **The chevron turns.** The reference ships `rotate-180` on every icon regardless
+  of state, which tells the reader nothing. Closed points down, open points up.
+- **The panel is the `hidden` attribute rather than a `hidden` utility class**, so
+  the state cannot be knocked out of step with `aria-expanded` by a stylesheet,
+  and `Accordion.css` repeats `[hidden] { display: none }` so nothing can override
+  it either.
+- **Panels toggle independently.** That is Flowbite's own default
+  (`alwaysOpen: true`); one at a time suits a quiz, not eight questions someone
+  may want to compare.
+
+**Collapsed is `hidden`, never absent.** This is the part that matters beyond
+looks: every answer is rendered on every open, so all eight stay in the DOM and in
+the page source. A `<details>` element would have been tidier and would also have
+hidden seven answers from anything that does not click. Because a future swap to a
+component that renders only the open panel would take seven answers off the live
+page *without* failing any other check in the suite — the static shell still
+carries them — `verify-static-html.mjs` renders the accordion for real (a small
+Vite SSR build and `renderToStaticMarkup`, both from dependencies the project
+already has) and asserts the contract: eight buttons, eight panels, each button
+naming a panel that exists, each panel pointing back at its own heading, a panel
+hidden exactly when its button says so, and every answer present in the markup
+while collapsed.
+
+**Both new sections are centred columns.** `margin-inline: auto` moves the facts
+and the FAQ to the middle of the page, because the earlier arrangement pinned a
+44rem block against the left padding and left the right half of a desktop screen
+empty. The text inside stays left-aligned — a facts list is a column of
+label/value pairs and a centred list reads as decoration — and the glass keeps the
+space above them, which is what `.section--bottom` is for. It is scoped to these
+two sections rather than set on `.section__content`, which would move the flavor
+sections off the sides their cup targets reserve.
 
 ## Current behavior
 

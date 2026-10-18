@@ -11,8 +11,19 @@
  *
  * It also checks the files a crawler reads before it ever fetches a page:
  * robots.txt, the sitemap and llms.txt.
+ *
+ * Finally it renders the FAQ accordion in isolation — a small Vite SSR build,
+ * then `renderToStaticMarkup`, both from dependencies the project already has —
+ * because the accordion is the one place where a change could hide seven answers
+ * from every crawler while leaving every other check in this file green. See the
+ * comment above that section.
  */
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, readdirSync, existsSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import react from '@vitejs/plugin-react'
 import { build } from 'vite'
 import { brand } from '../src/config/brand.js'
 import { flavors } from '../src/config/flavors.js'
@@ -41,16 +52,21 @@ const check = (label, condition, detail = '') => {
  * collapsed. Checks run against this rather than the raw source so a passing
  * assertion means the words are visible, not merely present in an attribute or a
  * script block.
+ *
+ * Numeric entities are decoded because React emits `&#x27;` for an apostrophe,
+ * and this script compares React's output to the same strings it renders.
+ * `&amp;` is decoded last, or `&amp;lt;` would arrive as a tag.
  */
 const textOf = (html) =>
   html
     .replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&')
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)))
+    .replace(/&quot;/g, '"')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ')
     .trim()
 
@@ -105,6 +121,126 @@ for (const entry of faq()) {
   check(`FAQ answer in source: ${entry.question}`, isSubstring(visible, entry.answer))
 }
 check('there are eight FAQ entries', faq().length === 8, `found ${faq().length}`)
+
+/* --- The FAQ accordion, actually rendered ------------------------------- */
+
+/*
+ * Everything above reads the built HTML, which is the static shell: a flat list
+ * of answers, because there is no script in that document to disclose anything
+ * with. The accordion itself only exists once React has run, so the only way to
+ * check it without a browser is to render it.
+ *
+ * Worth the twenty lines, because the accordion is where this phase could be
+ * quietly undone. Answers that are not the open one must be `hidden` — not
+ * missing. A future swap to a component that renders only the open panel would
+ * take seven answers off the live page, pass every other check in this file (the
+ * shell still carries them) and look correct in a browser. So the contract is
+ * asserted against a real render.
+ *
+ * The build is deliberately isolated: `configFile: false`, because the app's own
+ * config brings a plugin that writes into dist/ on closeBundle, and this build is
+ * a probe, not the site.
+ */
+console.log('\nFAQ accordion\n')
+
+const ssrOut = 'node_modules/.verify/accordion'
+
+await build({
+  logLevel: 'silent',
+  configFile: false,
+  plugins: [react()],
+  build: { ssr: 'src/ui/Accordion.jsx', outDir: ssrOut, emptyOutDir: true, minify: false },
+})
+
+const { default: Accordion } = await import(pathToFileURL(resolve(ssrOut, 'Accordion.js')).href)
+
+const accordionItems = faq().map((entry, index) => ({
+  id: `faq-${index + 1}`,
+  question: entry.question,
+  answer: entry.answer,
+}))
+
+// `useState` in a server render yields the initial state, which is exactly the
+// state a crawler that never clicks would find.
+const accordion = renderToStaticMarkup(
+  createElement(Accordion, { id: 'faq-accordion', items: accordionItems }),
+)
+const accordionText = textOf(accordion)
+
+const tagAttr = (tag, name) => tag.match(new RegExp(`${name}="([^"]*)"`))?.[1] ?? null
+const triggers = [...accordion.matchAll(/<button\b[^>]*>/g)].map((match) => match[0])
+const buttons = [...accordion.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map((match) => match[0])
+const panels = [...accordion.matchAll(/<div\b[^>]*accordion__panel[^>]*>/g)].map((match) => match[0])
+
+check('the FAQ renders as eight disclosure buttons', triggers.length === 8, `found ${triggers.length}`)
+check('and eight panels', panels.length === 8, `found ${panels.length}`)
+
+const panelIds = panels.map((panel) => tagAttr(panel, 'id'))
+const headingIds = [...accordion.matchAll(/<h[1-6] id="([^"]+)"/g)].map((match) => match[1])
+
+check(
+  'every button declares its expanded state',
+  triggers.every((trigger) => ['true', 'false'].includes(tagAttr(trigger, 'aria-expanded'))),
+)
+check(
+  'every button names a panel that exists',
+  triggers.every((trigger) => panelIds.includes(tagAttr(trigger, 'aria-controls'))),
+)
+check(
+  'every button also carries the Flowbite target for that panel',
+  triggers.every((trigger) => tagAttr(trigger, 'data-accordion-target') === `#${tagAttr(trigger, 'aria-controls')}`),
+)
+check(
+  'every panel points back at its own heading',
+  panels.every((panel) => headingIds.includes(tagAttr(panel, 'aria-labelledby'))),
+)
+check(
+  'a panel is hidden exactly when its button says it is',
+  triggers.every((trigger, index) => {
+    const isCollapsed = tagAttr(panels[index] ?? '', 'hidden') !== null
+    return isCollapsed === (tagAttr(trigger, 'aria-expanded') === 'false')
+  }),
+)
+check('one panel is open on arrival', panels.filter((panel) => !panel.includes('hidden')).length === 1)
+check(
+  /*
+   * The chevron points down while a row is closed, inviting a press, and up while
+   * it is open. The version this was copied from ships `rotate-180` on every icon
+   * regardless of state, which tells the reader nothing.
+   */
+  'the chevron follows the panel it belongs to',
+  buttons.length === 8 &&
+    buttons.every(
+      (button) =>
+        button.includes('data-accordion-icon') &&
+        button.includes('accordion__icon is-open') === button.includes('aria-expanded="true"'),
+    ),
+)
+check(
+  'the answers are in the markup even while their panels are collapsed',
+  faq().every((entry) => isSubstring(accordionText, entry.answer)),
+  'collapsed is the hidden attribute, not an absent answer',
+)
+check(
+  'the questions are subheadings of the section, not headings beside it',
+  (accordion.match(/<h3 /g) || []).length === 8 && !accordion.includes('<h2'),
+)
+check(
+  'the questions are rendered in order',
+  accordionItems.every((item, index) => {
+    const position = accordionText.indexOf(item.question)
+    const previous = index === 0 ? -1 : accordionText.indexOf(accordionItems[index - 1].question)
+    return position > previous
+  }),
+)
+
+const cssFile = readdirSync(`${root}/assets`).find((name) => name.endsWith('.css'))
+const css = cssFile ? readFileSync(`${root}/assets/${cssFile}`, 'utf8') : ''
+check(
+  'the disclosure button clears the 44px tap target',
+  /\.accordion__trigger\{[^}]*min-height:44px/.test(css),
+  'AGENTS.md section 6',
+)
 
 check('the title comes from config', html.includes(`<title>${metaTitle}</title>`))
 check('the description comes from config', html.includes(metaDescription))

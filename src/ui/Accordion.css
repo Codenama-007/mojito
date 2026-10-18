@@ -1,0 +1,100 @@
+/*
+ * Flowbite's accordion, in vanilla CSS.
+ *
+ * The source markup is a stack of bordered rows and a card behind them. The
+ * opacity, radius and blur here are the same tokens the fact cards use, so the two
+ * sections side by side read as one thing.
+ *
+ * `data-accordion`, `data-accordion-target` and `data-accordion-icon` are not
+ * styled — they are markers, and the toggle is React's. See Accordion.jsx.
+ */
+
+.accordion {
+  margin-top: 22px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--surface);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* A rule between rows rather than a border on each, so the collapsed and open
+   states cannot disagree about where a row ends. */
+.accordion__item + .accordion__item {
+  border-top: 1px solid var(--border);
+}
+
+.accordion__heading {
+  font: inherit;
+}
+
+.accordion__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  /* AGENTS.md: every tap target is at least 44px. The padding alone clears it,
+     but it is asserted rather than assumed because this is the one control on the
+     page that a thumb has to hit. */
+  min-height: 44px;
+  padding: 15px 18px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: clamp(16px, 4.2vw, 19px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-align: left;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .accordion__trigger:hover {
+    color: var(--flavor-accent);
+  }
+}
+
+.accordion__trigger:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -3px;
+}
+
+/* The path in Accordion.jsx draws an up chevron, so closed has to rotate it to
+   point down: a closed row invites a press, an open one offers to close. */
+.accordion__icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  transform: rotate(180deg);
+  transition: transform 200ms ease;
+}
+
+.accordion__icon.is-open {
+  transform: rotate(0deg);
+}
+
+.accordion__panel {
+  padding: 0 18px 16px;
+}
+
+/* Belt and braces: the `hidden` attribute is the state, and if anything ever sets
+   a display value on this element it has to lose. */
+.accordion__panel[hidden] {
+  display: none;
+}
+
+.accordion__answer {
+  max-width: 40rem;
+  color: var(--ink-soft);
+  font-size: clamp(14px, 3.8vw, 16px);
+  line-height: 1.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .accordion__icon {
+    transition: none;
+  }
+}

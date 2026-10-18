@@ -1,7 +1,22 @@
 /* Wider than the default .section__content: the fact list is two columns of
-   label/value pairs and 34rem squeezed the values. */
+   label/value pairs and 34rem squeezed the values.
+ *
+ * `margin-inline: auto` centres the column on the page — as a flex item of
+ * .section that is the main axis — because the earlier arrangement pinned a
+ * 44rem block against the left padding and left the right half of a desktop
+ * screen empty. The text inside stays left-aligned: a facts list is a column of
+ * label/value pairs and centring the values would make them unreadable as a
+ * table. The glass keeps the space above, which is what .section--bottom is for.
+ *
+ * Scoped to this section and the FAQ rather than put on .section__content, which
+ * would move the flavor sections off the sides their cup targets reserve.
+ *
+ * `width: 100%` is there so this column and the FAQ column are exactly the same
+ * width; a flex item is otherwise sized to its content. */
 .facts__content {
+  width: 100%;
   max-width: 44rem;
+  margin-inline: auto;
 }
 
 .facts__title {

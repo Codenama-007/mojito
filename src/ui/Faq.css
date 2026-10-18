@@ -1,5 +1,15 @@
+/* The section header. The questions themselves are Accordion.css's job. */
+
+/* Centred as a column, for the same reason and in the same way as
+   .facts__content — see BrandFacts.css. The questions stay left-aligned inside
+   it, because an accordion is a list and a centred list reads as decoration.
+   `width: 100%` as well as the max-width so this column is exactly as wide as the
+   facts one: without it a flex item is sized to its content, and the longest
+   question here is narrower than 44rem. */
 .faq__content {
+  width: 100%;
   max-width: 44rem;
+  margin-inline: auto;
 }
 
 .faq__title {
@@ -7,32 +17,4 @@
   font-weight: 750;
   letter-spacing: -0.035em;
   line-height: 1;
-}
-
-.faq__list {
-  margin: 22px 0 0;
-}
-
-.faq__row {
-  padding: 14px 0;
-  border-top: 1px solid var(--border);
-}
-
-.faq__row:first-child {
-  border-top: 0;
-}
-
-.faq__question {
-  color: var(--ink);
-  font-size: clamp(16px, 4.2vw, 19px);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-
-.faq__answer {
-  max-width: 40rem;
-  margin: 6px 0 0;
-  color: var(--ink-soft);
-  font-size: clamp(14px, 3.8vw, 16px);
-  line-height: 1.5;
 }

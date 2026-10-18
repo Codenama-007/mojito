@@ -128,3 +128,32 @@ to the contact section (`start: 'top bottom'`, `end: 'center center'`), so
 inserting sections above it moves nothing. `verify-cup-fit.mjs` sweeps
 `SECTION_ORDER` rather than a hardcoded list, so it picked up the nine sections by
 itself.
+
+## 7. Follow-up in the same phase: the accordion, and centring
+
+Prompt 13 arrived with the rendered facts list and FAQ pasted back, and two asks:
+make the FAQ an accordion (Flowbite's, in vanilla CSS), and bring both of those
+sections into the centre of the page.
+
+The accordion is `src/ui/Accordion.jsx`, a translation of the supplied markup with
+the state moved from Flowbite's script to React. The important part is not the
+look, it is that **collapsed is the `hidden` attribute, not an absent answer** —
+every answer is in the DOM on every open. Reaching for `<details>` would have been
+tidier and would have quietly undone the point of the phase, so the contract is
+now asserted: `verify-static-html.mjs` builds the accordion in isolation with a
+small Vite SSR build and renders it with `renderToStaticMarkup` — both from
+dependencies the project already had — then checks eight buttons, eight panels,
+each `aria-controls` resolving, each panel pointing back at its own heading, a
+panel hidden exactly when its button says so, and all eight answers present while
+seven are collapsed. Without that render the failure mode is a component that
+hides seven answers from every crawler while every other check in the suite stays
+green, because the static shell still carries them.
+
+"Centre of the page" was put back to the owner as a question rather than guessed,
+because the glass is centred directly above these sections: the column could move,
+the column and its vertical position could move, or the text inside could be
+centred too, and two of those three put paragraphs on top of the cup. Answer:
+centre the column, leave the text left-aligned and the glass where it is.
+`margin-inline: auto` on `.facts__content` and `.faq__content`, scoped to those two
+rather than set on `.section__content`, which would drag the flavor sections off
+the sides their cup targets reserve.
